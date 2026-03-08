@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>猪猪系统</title>
+  <style>
+    :root{--bg:#f5f5f1;--panel:#fff;--soft:#f0efe8;--line:#dfddd2;--text:#1f1f1a;--muted:#6e6a5f;--accent:#1f7a5c;--accent-soft:#e7f4ee;--danger:#c94949;--shadow:0 18px 50px rgba(25,32,24,.08)}
+    *{box-sizing:border-box}html,body{margin:0;height:100%;background:radial-gradient(circle at top,#fbfbf7 0%,var(--bg) 55%,#ebe9de 100%);color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+    button,input,textarea,select{font:inherit}button{cursor:pointer}
+    .app{height:100vh;display:grid;grid-template-columns:280px minmax(0,1fr) 350px;gap:16px;padding:16px}
+    .side,.main,.panel{background:rgba(255,255,255,.86);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.7);box-shadow:var(--shadow);border-radius:24px;min-height:0}
+    .side{display:flex;flex-direction:column;overflow:hidden}.brand{padding:20px 18px 16px;border-bottom:1px solid var(--line)}.brand h1{margin:0;font-size:20px}.brand p{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.5}
+    .stack{display:grid;gap:10px}.pad{padding:14px}.scroll{overflow:auto;min-height:0}.label{margin:0 0 10px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+    .btn,.ghost,.danger{width:100%;border:0;border-radius:14px;padding:12px 14px;transition:.18s}.btn{background:var(--accent);color:#fff;font-weight:600}.ghost{background:var(--soft);color:var(--text);font-weight:600}.danger{background:rgba(201,73,73,.1);color:var(--danger);font-weight:600}
+    .btn:hover,.ghost:hover,.danger:hover,.item:hover,.toolbar button:hover{transform:translateY(-1px)}
+    .item{width:100%;text-align:left;padding:12px 14px;border-radius:16px;border:1px solid transparent;background:transparent;transition:.2s}.item:hover{background:rgba(31,122,92,.06)}.item.active{background:var(--accent-soft);border-color:rgba(31,122,92,.22)}
+    .row{display:flex;align-items:center;gap:12px}.avatar{width:38px;height:38px;border-radius:12px;background:#f2f7f4;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}.title{font-weight:600;line-height:1.3}.sub{color:var(--muted);font-size:12px;line-height:1.4;margin-top:3px}
+    .delete{margin-left:auto;border:0;background:transparent;color:var(--muted);padding:4px 6px;border-radius:8px}.delete:hover{color:var(--danger);background:rgba(201,73,73,.08)}
+    .main{display:grid;grid-template-rows:auto 1fr auto;overflow:hidden}.head{padding:20px 24px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:center}.head h2{margin:0;font-size:18px}.head p{margin:4px 0 0;color:var(--muted);font-size:13px}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap}.toolbar button{border:1px solid var(--line);background:#fff;color:var(--text);border-radius:12px;padding:10px 12px;transition:.18s}
+    .msgs{overflow:auto;padding:28px 22px}.msgs-inner{max-width:860px;margin:0 auto;display:grid;gap:20px}.empty{min-height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);padding:32px}.empty-card{max-width:520px;background:rgba(255,255,255,.72);border:1px solid var(--line);border-radius:24px;padding:28px}.empty h3{margin:0 0 8px;color:var(--text);font-size:28px}
+    .msg{display:grid;grid-template-columns:52px minmax(0,1fr);gap:14px;align-items:start}.msg.user{grid-template-columns:minmax(0,1fr) 52px}.msg.user .wrap{order:-1}.msg .ava{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;background:#f4f4ef;border:1px solid var(--line)}.msg.user .ava{background:#17202a;color:#fff}
+    .wrap{display:grid;gap:8px}.meta{display:flex;gap:10px;color:var(--muted);font-size:12px;align-items:center;flex-wrap:wrap}.bubble{background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:20px;padding:16px 18px;line-height:1.72;font-size:15px;white-space:pre-wrap;word-break:break-word}.msg.user .bubble{background:#f1f5f9}.bubble pre{margin:14px 0;padding:14px;border-radius:14px;background:#101826;color:#ecf4ff;overflow:auto}.bubble code{font-family:Consolas,monospace}
+    .composer{border-top:1px solid var(--line);padding:16px 18px 18px;background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(248,247,242,.95))}.composer-inner{max-width:860px;margin:0 auto}.box{border:1px solid var(--line);border-radius:24px;background:#fff;padding:14px;display:grid;gap:12px;box-shadow:0 12px 30px rgba(0,0,0,.05)}textarea{width:100%;border:0;resize:none;outline:none;min-height:54px;max-height:220px;font-size:15px;line-height:1.6;color:var(--text);background:transparent}
+    .foot{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.hint{color:var(--muted);font-size:12px}.send{display:flex;gap:8px}.send button{border:0;border-radius:14px;padding:10px 16px;font-weight:600}.send .go{background:var(--accent);color:#fff}.send .stop{background:rgba(201,73,73,.14);color:var(--danger);display:none}
+    .panel{display:flex;flex-direction:column;overflow:hidden}.panel-head{padding:18px 18px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:center}.panel-head h2{margin:0;font-size:18px}.panel-scroll{overflow:auto;padding:18px;display:grid;gap:18px}
+    .card{background:rgba(255,255,255,.82);border:1px solid var(--line);border-radius:18px;padding:16px;display:grid;gap:12px}.card h3{margin:0;font-size:14px}.field{display:grid;gap:6px}.field label{font-size:12px;color:var(--muted)}.field input,.field textarea,.field select{width:100%;border:1px solid var(--line);border-radius:12px;background:#fff;padding:11px 12px;color:var(--text)}.field textarea{min-height:140px;resize:vertical}
+    .inline{display:flex;gap:8px;flex-wrap:wrap}.inline button{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 12px}.chip{display:inline-flex;align-items:center;gap:8px;border-radius:999px;background:var(--soft);padding:9px 12px;font-size:12px;color:var(--muted)}.dot{width:9px;height:9px;border-radius:50%;background:#b7b2a8}.dot.on{background:#24a36c}
+    .models{display:grid;gap:8px;max-height:180px;overflow:auto;padding-right:4px}.model{font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:12px;padding:10px 12px;background:rgba(255,255,255,.6)}
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,17,19,.34);padding:20px}.modal.open{display:flex}.modal-card{width:min(640px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:24px;box-shadow:0 28px 80px rgba(0,0,0,.18);padding:22px;display:grid;gap:14px}.modal-card h2,.modal-card p{margin:0}
+    .typing{display:inline-flex;align-items:center;gap:6px;min-height:24px}.typing span{width:7px;height:7px;border-radius:50%;background:#8f8b81;animation:blink 1.1s infinite ease-in-out}.typing span:nth-child(2){animation-delay:.16s}.typing span:nth-child(3){animation-delay:.32s}.streaming .bubble::after{content:"";display:inline-block;width:8px;height:1.2em;margin-left:4px;vertical-align:middle;background:var(--accent);animation:cursor 1s steps(1) infinite}.toast{position:fixed;right:24px;bottom:24px;background:#17202a;color:#fff;padding:12px 16px;border-radius:14px;box-shadow:0 20px 40px rgba(0,0,0,.2);opacity:0;transform:translateY(12px);transition:.2s;pointer-events:none}.toast.show{opacity:1;transform:translateY(0)}
+    .app.side-collapsed{grid-template-columns:minmax(0,1fr) 350px}.app.side-collapsed .side{display:none}.app.panel-collapsed{grid-template-columns:280px minmax(0,1fr)}.app.panel-collapsed .panel{display:none}.app.side-collapsed.panel-collapsed{grid-template-columns:minmax(0,1fr)}
+    @keyframes blink{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-2px)}}@keyframes cursor{50%{opacity:0}}
+    @media (max-width:1280px){.app{grid-template-columns:260px minmax(0,1fr)}.panel{position:fixed;top:16px;right:16px;bottom:16px;width:min(350px,calc(100vw - 32px));z-index:20;display:none}.panel.open{display:flex}}
+    @media (max-width:900px){.app{grid-template-columns:1fr;padding:10px}.side{display:none}.head{padding:16px}.msgs{padding:18px 12px}.composer{padding:12px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="side">
+      <div class="brand"><h1>猪猪系统</h1><p>多角色、多模型、独立记忆的 AI 对话工作台</p></div>
+      <div class="pad stack">
+        <button class="btn" id="newChatBtn">+ 新对话</button>
+        <button class="ghost" id="newRoleBtn">+ 新角色</button>
+      </div>
+      <div class="pad scroll"><h3 class="label">AI 角色</h3><div class="stack" id="roleList"></div></div>
+      <div class="pad scroll"><h3 class="label">当前角色会话</h3><div class="stack" id="sessionList"></div></div>
+    </aside>
+    <main class="main">
+      <header class="head">
+        <div class="row">
+          <div class="avatar" id="roleAvatar">🐷</div>
+          <div><h2 id="roleName">猪猪</h2><p id="roleMeta">选择角色并开始对话</p></div>
+        </div>
+        <div class="toolbar">
+          <button id="toggleSideBtn">角色</button>
+          <button id="togglePanelBtn">设置</button>
+          <button id="refreshBtn">刷新</button>
+        </div>
+      </header>
+      <section class="msgs" id="msgs">
+        <div class="empty" id="empty"><div class="empty-card"><h3>开始一个清爽的新对话</h3><p>左侧选择角色，右侧调整模型与 Prompt。每个角色都会拥有自己独立的会话、记忆和人格数据。</p></div></div>
+        <div class="msgs-inner" id="msgsInner"></div>
+      </section>
+      <footer class="composer">
+        <div class="composer-inner">
+          <div class="box">
+            <textarea id="input" placeholder="输入消息，按 Enter 发送，Shift + Enter 换行"></textarea>
+            <div class="foot">
+              <div class="hint">聊天会绑定到当前角色的独立记忆系统</div>
+              <div class="send"><button class="stop" id="stopBtn" type="button">停止</button><button class="go" id="sendBtn" type="button">发送</button></div>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </main>
+    <aside class="panel" id="panel">
+      <div class="panel-head"><h2>角色与模型设置</h2><button class="ghost" id="saveBtn" style="width:auto;padding:10px 14px">保存</button></div>
+      <div class="panel-scroll">
+        <section class="card">
+          <h3>服务端</h3>
+          <div class="field"><label>后端 API 地址</label><input id="apiBase" type="text" placeholder="http://localhost:5181"></div>
+          <div class="inline"><button id="applyApiBtn" type="button">应用地址</button><button id="checkBtn" type="button">检测后端</button><span class="chip"><span class="dot" id="backendDot"></span><span id="backendText">未检测</span></span></div>
+        </section>
+        <section class="card">
+          <h3>角色信息</h3>
+          <div class="field"><label>角色名称</label><input id="cfgName" type="text"></div>
+          <div class="field"><label>头像</label><input id="cfgAvatar" type="text" maxlength="4" placeholder="🐷"></div>
+          <div class="field"><label>角色简介</label><input id="cfgDesc" type="text"></div>
+          <div class="field"><label>聊天提供方</label><select id="cfgProvider"><option value="minimax">MiniMax</option><option value="api">OpenAI 兼容 API</option><option value="ollama">Ollama</option></select></div>
+          <div class="inline"><button id="exportRoleBtn" type="button">导出角色</button><button id="importRoleBtn" type="button">导入角色</button><button id="deleteRoleBtn" type="button">删除角色</button></div>
+        </section>
+        <section class="card">
+          <h3>模型</h3>
+          <div class="field"><label>聊天模型</label><input id="cfgChatModel" type="text"></div>
+          <div class="field"><label>视觉模型</label><input id="cfgVisionModel" type="text"></div>
+          <div class="field"><label>向量模型</label><input id="cfgEmbeddingModel" type="text"></div>
+          <div class="field"><label>温度</label><input id="cfgTemperature" type="number" step="0.1" min="0" max="2"></div>
+        </section>
+        <section class="card">
+          <h3>接入地址</h3>
+          <div class="field"><label>聊天 Ollama 地址</label><input id="cfgChatHost" type="text" placeholder="http://127.0.0.1:11434"></div>
+          <div class="field"><label>向量 Ollama 地址</label><input id="cfgEmbeddingHost" type="text" placeholder="http://127.0.0.1:11435"></div>
+          <div class="field"><label>API Base URL</label><input id="cfgApiBaseUrl" type="text" placeholder="https://api.minimaxi.com/v1"></div>
+          <div class="field"><label>API Key</label><input id="cfgApiKey" type="password" placeholder="sk-..."></div>
+          <div class="inline"><button id="loadChatModelsBtn" type="button">读取聊天模型</button><button id="loadEmbeddingModelsBtn" type="button">读取向量模型</button></div>
+          <div class="models" id="modelList"></div>
+        </section>
+        <section class="card">
+          <h3>记忆与对话参数</h3>
+          <div class="field"><label>启用两步分析</label><select id="cfgAnalysis"><option value="true">启用</option><option value="false">关闭</option></select></div>
+          <div class="field"><label>长期记忆检索条数</label><input id="cfgMemoryTopK" type="number" min="1" max="50"></div>
+          <div class="field"><label>当前对话历史条数</label><input id="cfgHistoryLimit" type="number" min="1" max="50"></div>
+        </section>
+        <section class="card">
+          <h3>角色 Prompt</h3>
+          <div class="field"><label>系统设定</label><textarea id="cfgPrompt"></textarea></div>
+        </section>
+        <section class="card">
+          <h3>角色记忆管理</h3>
+          <div class="field"><label>搜索记忆</label><input id="memoryQuery" type="text" placeholder="输入关键词后搜索"></div>
+          <div class="inline"><button id="searchMemoryBtn" type="button">搜索</button><button id="reloadMemoryBtn" type="button">刷新列表</button></div>
+          <div class="models" id="memoryList"></div>
+        </section>
+      </div>
+    </aside>
+  </div>
+  <div class="modal" id="roleModal">
+    <div class="modal-card">
+      <h2>创建新角色</h2>
+      <p>创建后，服务端会为这个角色建立独立的会话、记忆和人格目录。</p>
+      <div class="field"><label>角色名称</label><input id="newName" type="text" placeholder="例如：技术猪猪"></div>
+      <div class="field"><label>头像</label><input id="newAvatar" type="text" maxlength="4" placeholder="🤖"></div>
+      <div class="field"><label>角色简介</label><input id="newDesc" type="text" placeholder="例如：偏代码助手"></div>
+      <div class="field"><label>聊天提供方</label><select id="newProvider"><option value="minimax">MiniMax</option><option value="api">OpenAI 兼容 API</option><option value="ollama">Ollama</option></select></div>
+      <div class="field"><label>聊天模型</label><input id="newChatModel" type="text" placeholder="模型名称"></div>
+      <div class="field"><label>角色 Prompt</label><textarea id="newPrompt" style="min-height:120px"></textarea></div>
+      <div class="inline"><button id="closeModalBtn" type="button">取消</button><button id="createRoleBtn" type="button">创建角色</button></div>
+    </div>
+  </div>
+  <div class="modal" id="importModal">
+    <div class="modal-card">
+      <h2>导入角色</h2>
+      <p>粘贴角色导出 JSON。可用于迁移某个角色的配置、会话、记忆和成长数据。</p>
+      <div class="field"><label>导入 JSON</label><textarea id="importJson" style="min-height:220px"></textarea></div>
+      <div class="field"><label>导入模式</label><select id="importOverwrite"><option value="false">存在同名角色时拒绝</option><option value="true">覆盖同名角色</option></select></div>
+      <div class="inline"><button id="closeImportModalBtn" type="button">取消</button><button id="submitImportBtn" type="button">开始导入</button></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script>
+    const state={apiBase:localStorage.getItem("pig-api-base")||guessApiBase(),roles:[],roleId:"default",role:null,sessions:[],sessionId:null,sending:false,currentAbort:null,sideCollapsed:localStorage.getItem("pig-side-collapsed")==="1",panelCollapsed:localStorage.getItem("pig-panel-collapsed")==="1",streamRender:null};
+    function guessApiBase(){if(location.protocol.startsWith("http")){const port=location.port==="5180"?"5181":location.port;return `${location.protocol}//${location.hostname}${port?":"+port:""}`}return "http://localhost:5181"}
+    const $=id=>document.getElementById(id), esc=t=>{const d=document.createElement("div");d.textContent=t||"";return d.innerHTML};
+    const api=p=>`${state.apiBase}${p}`;
+    async function j(path,opt={}){const r=await fetch(api(path),opt);if(!r.ok)throw new Error(await r.text()||`HTTP ${r.status}`);return r.json()}
+    function toast(msg){$("toast").textContent=msg;$("toast").classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>$("toast").classList.remove("show"),2400)}
+    function fmt(ts){if(!ts)return"";const d=new Date(ts);if(Number.isNaN(d.getTime()))return"";return d.toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})}
+    function md(text){return esc(text||"").replace(/```([\s\S]*?)```/g,(_,c)=>`<pre><code>${c.trim()}</code></pre>`)}
+    function setApiBase(){state.apiBase=$("apiBase").value.trim()||guessApiBase();localStorage.setItem("pig-api-base",state.apiBase)}
+    function setSending(v){state.sending=v;$("sendBtn").disabled=v;$("stopBtn").style.display=v?"inline-flex":"none"}
+    function applyLayoutState(){const app=document.querySelector(".app");app.classList.toggle("side-collapsed",state.sideCollapsed);app.classList.toggle("panel-collapsed",state.panelCollapsed);$("toggleSideBtn").textContent=state.sideCollapsed?"展开角色":"折叠角色";$("togglePanelBtn").textContent=state.panelCollapsed?"展开设置":"折叠设置"}
+    function toggleSide(){state.sideCollapsed=!state.sideCollapsed;localStorage.setItem("pig-side-collapsed",state.sideCollapsed?"1":"0");applyLayoutState()}
+    function togglePanel(){state.panelCollapsed=!state.panelCollapsed;localStorage.setItem("pig-panel-collapsed",state.panelCollapsed?"1":"0");applyLayoutState()}
+    function autoSize(){$("input").style.height="0px";$("input").style.height=`${Math.min($("input").scrollHeight,220)}px`}
+    function updateHeader(){const r=state.role||{};$("roleAvatar").textContent=r.avatar||"🤖";$("roleName").textContent=r.name||"未选择角色";$("roleMeta").textContent=`${r.description||"独立会话与记忆空间"}${r.provider?` · ${r.provider}`:""}`}
+    function syncForm(){const r=state.role||{};$("cfgName").value=r.name||"";$("cfgAvatar").value=r.avatar||"🤖";$("cfgDesc").value=r.description||"";$("cfgProvider").value=r.provider||"minimax";$("cfgChatModel").value=r.chat_model||"";$("cfgVisionModel").value=r.vision_model||"";$("cfgEmbeddingModel").value=r.embedding_model||"";$("cfgChatHost").value=r.chat_ollama_host||"";$("cfgEmbeddingHost").value=r.embedding_host||"";$("cfgApiBaseUrl").value=r.api_base_url||"";$("cfgApiKey").value=r.api_key||"";$("cfgAnalysis").value=String(r.analysis_enabled!==false);$("cfgMemoryTopK").value=r.memory_top_k||20;$("cfgHistoryLimit").value=r.history_limit||20;$("cfgTemperature").value=r.temperature??0.7;$("cfgPrompt").value=r.system_prompt||""}
+    async function checkBackend(){try{setApiBase();await j("/");$("backendDot").classList.add("on");$("backendText").textContent="后端在线";return true}catch(e){$("backendDot").classList.remove("on");$("backendText").textContent="后端不可用";toast("后端连接失败");return false}}
+    async function loadRoles(resetSession=true){const data=await j("/api/roles");state.roles=data.roles||[];if(!state.roles.find(r=>r.id===state.roleId))state.roleId=data.default_role_id||"default";renderRoles();await selectRole(state.roleId,resetSession)}
+    function renderRoles(){$("roleList").innerHTML=state.roles.map(r=>`<button class="item ${r.id===state.roleId?"active":""}" data-role="${r.id}"><div class="row"><div class="avatar">${esc(r.avatar||"🤖")}</div><div style="min-width:0"><div class="title">${esc(r.name||r.id)}</div><div class="sub">${esc(r.description||r.provider||"")}</div></div></div></button>`).join("");document.querySelectorAll("[data-role]").forEach(b=>b.onclick=()=>selectRole(b.dataset.role))}
+    async function selectRole(id,resetSession=true){state.roleId=id;state.role=await j(`/api/roles/${id}`);if(resetSession)state.sessionId=null;syncForm();renderRoles();updateHeader();await loadSessions();await loadMemories();if(resetSession)renderMessages([]);else if(state.sessionId)await openSession(state.sessionId)}
+    async function loadSessions(){state.sessions=await j(`/api/sessions?role_id=${encodeURIComponent(state.roleId)}`);renderSessions()}
+    function renderSessions(){if(!state.sessions.length){$("sessionList").innerHTML=`<div class="sub">当前角色还没有会话</div>`;return}$("sessionList").innerHTML=state.sessions.map(s=>`<div class="item ${s.id===state.sessionId?"active":""}"><div class="row"><button style="all:unset;cursor:pointer;flex:1;min-width:0" data-session="${s.id}"><div class="title" style="font-size:14px">${esc(s.title||"新对话")}</div><div class="sub">${fmt(s.updated_at)}</div></button><button class="delete" type="button" data-del="${s.id}">删除</button></div></div>`).join("");document.querySelectorAll("[data-session]").forEach(b=>b.onclick=()=>openSession(b.dataset.session));document.querySelectorAll("[data-del]").forEach(b=>b.onclick=e=>{e.stopPropagation();removeSession(b.dataset.del)})}
+    async function newSession(){const s=await j("/api/sessions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({role_id:state.roleId,title:"新对话"})});state.sessionId=s.id;await loadSessions();renderMessages([]);toast("新会话已创建")}
+    async function openSession(id){state.sessionId=id;const s=await j(`/api/sessions/${id}?role_id=${encodeURIComponent(state.roleId)}`);renderSessions();renderMessages(s.messages||[])}
+    async function removeSession(id){await j(`/api/sessions/${id}?role_id=${encodeURIComponent(state.roleId)}`,{method:"DELETE"});if(state.sessionId===id){state.sessionId=null;renderMessages([])}await loadSessions();toast("会话已删除")}
+    function messageHtml(m,extraClass="",bodyOverride=""){return `<article class="msg ${m.role==="user"?"user":"assistant"} ${extraClass}"><div class="ava">${m.role==="user"?"你":esc(state.role?.avatar||"🤖")}</div><div class="wrap"><div class="meta"><strong>${m.role==="user"?"你":esc(state.role?.name||"AI")}</strong><span>${fmt(m.timestamp)}</span>${m.model?`<span>${esc(m.model)}</span>`:""}</div><div class="bubble">${bodyOverride||md(m.content)}</div></div></article>`}
+    function renderMessages(msgs){const wrap=$("msgsInner");if(!msgs.length){$("empty").style.display="flex";wrap.innerHTML="";return}$("empty").style.display="none";wrap.innerHTML=msgs.map(m=>messageHtml(m)).join("");scrollBottom()}
+    function appendMessage(m,extraClass="",bodyOverride=""){$("empty").style.display="none";$("msgsInner").insertAdjacentHTML("beforeend",messageHtml(m,extraClass,bodyOverride));const el=$("msgsInner").lastElementChild;scrollBottom();return el}
+    function appendTypingMessage(){return appendMessage({role:"assistant",content:"",timestamp:new Date().toISOString(),model:state.role?.chat_model||""},"loading",'<div class="typing"><span></span><span></span><span></span></div>')}
+    function updateMessageEl(el,m,extraClass=""){if(!el)return;el.className=`msg ${m.role==="user"?"user":"assistant"} ${extraClass}`.trim();el.dataset.content=m.content||"";el.querySelector(".ava").textContent=m.role==="user"?"你":(state.role?.avatar||"🤖");el.querySelector(".meta").innerHTML=`<strong>${m.role==="user"?"你":esc(state.role?.name||"AI")}</strong><span>${fmt(m.timestamp)}</span>${m.model?`<span>${esc(m.model)}</span>`:""}`;el.querySelector(".bubble").innerHTML=md(m.content||"");scrollBottom()}
+    function clearStreamRender(){const s=state.streamRender;if(!s)return;if(s.timer)clearTimeout(s.timer);state.streamRender=null}
+    function stepStreamRender(){const s=state.streamRender;if(!s||!s.el)return;if(!s.queue){s.timer=null;return}const chars=[...s.queue];const head=chars[0]||"";let take=1;if(chars.length>24)take=4;else if(chars.length>12)take=3;else if(chars.length>4)take=2;if(/[，。！？；：,.!?;:\n]/.test(head))take=1;const chunk=chars.slice(0,take).join("");s.queue=chars.slice(take).join("");s.visible+=chunk;s.el.dataset.content=s.visible;s.el.classList.remove("loading");s.el.classList.add("streaming");s.el.querySelector(".bubble").innerHTML=md(s.visible);scrollBottom();const delay=/[，。！？；：,.!?;:\n]/.test(chunk.slice(-1))?34:12;s.timer=setTimeout(stepStreamRender,delay)}
+    function ensureStreamRender(el){if(!state.streamRender||state.streamRender.el!==el){clearStreamRender();state.streamRender={el,queue:"",visible:el?.dataset?.content||"",timer:null}}return state.streamRender}
+    function appendStreamChunk(el,chunk){if(!el||!chunk)return;const s=ensureStreamRender(el);s.queue+=chunk;if(!s.timer)stepStreamRender()}
+    async function flushStreamRender(el){const s=state.streamRender;if(!s||s.el!==el)return;while(s.queue){stepStreamRender();await new Promise(r=>setTimeout(r,0))}clearStreamRender()}
+    function parseSseBlock(block){let event="message";let data="";for(const line of block.split(/\r?\n/)){if(line.startsWith("event:"))event=line.slice(6).trim();if(line.startsWith("data:"))data+=`${data?"\n":""}${line.slice(5).trimStart()}`}return{event,data}}
+    async function streamJson(path,payload,signal,onEvent){const r=await fetch(api(path),{method:"POST",headers:{"Content-Type":"application/json","Accept":"text/event-stream"},body:JSON.stringify(payload),signal});if(!r.ok)throw new Error(await r.text()||`HTTP ${r.status}`);if(!r.body)throw new Error("浏览器不支持流式响应");const reader=r.body.getReader();const decoder=new TextDecoder("utf-8");let buffer="";while(true){const {value,done}=await reader.read();buffer+=decoder.decode(value||new Uint8Array(),{stream:!done});let idx=buffer.indexOf("\n\n");while(idx!==-1){const block=buffer.slice(0,idx).trim();buffer=buffer.slice(idx+2);if(block){const parsed=parseSseBlock(block);onEvent(parsed.event,parsed.data?JSON.parse(parsed.data):{})}idx=buffer.indexOf("\n\n")}if(done)break}}
+    async function typewriterMessage(targetEl,text){if(!targetEl)return;targetEl.classList.add("streaming");const bubble=targetEl.querySelector(".bubble");let current="";for(const ch of (text||"")){current+=ch;bubble.innerHTML=md(current);scrollBottom();await new Promise(r=>setTimeout(r,/[\n。！？.!?]/.test(ch)?34:14))}targetEl.classList.remove("streaming");bubble.innerHTML=md(text||"");scrollBottom()}
+    function scrollBottom(){$("msgs").scrollTop=$("msgs").scrollHeight}
+    async function send(){const text=$("input").value.trim();if(!text||state.sending)return;if(!state.sessionId)await newSession();const controller=new AbortController();state.currentAbort=controller;clearStreamRender();setSending(true);appendMessage({role:"user",content:text,timestamp:new Date().toISOString()});$("input").value="";$("input").style.height="54px";const typingEl=appendTypingMessage();let finalMessage=null;try{await streamJson("/api/chat/stream",{message:text,session_id:state.sessionId,role_id:state.roleId},controller.signal,(event,data)=>{if(event==="start"){state.sessionId=data.session_id||state.sessionId;updateMessageEl(typingEl,{...(data.message||{}),role:"assistant",content:"",timestamp:data.message?.timestamp||new Date().toISOString(),model:data.message?.model||state.role?.chat_model||""},"streaming");ensureStreamRender(typingEl)}else if(event==="chunk"){appendStreamChunk(typingEl,data.content||"")}else if(event==="end"){state.sessionId=data.session?.id||state.sessionId;finalMessage=data.message||null}else if(event==="error"){throw new Error(data.message||"流式请求失败")}});await flushStreamRender(typingEl);if(finalMessage)updateMessageEl(typingEl,finalMessage);else if(typingEl){updateMessageEl(typingEl,{role:"assistant",content:typingEl.dataset.content||"",timestamp:new Date().toISOString(),model:state.role?.chat_model||""})}await loadSessions()}catch(e){const partial=typingEl?.dataset?.content||"";clearStreamRender();if(e.name==="AbortError"){if(typingEl){if(partial){updateMessageEl(typingEl,{role:"assistant",content:partial,timestamp:new Date().toISOString(),model:state.role?.chat_model||""})}else{typingEl.remove()}}toast("已停止当前请求")}else{typingEl?.remove();appendMessage({role:"assistant",content:`请求失败：${e.message}`,timestamp:new Date().toISOString()})}}finally{clearStreamRender();state.currentAbort=null;setSending(false)}}
+    async function saveRole(){if(!state.roleId)return;const keep=state.sessionId;const payload={name:$("cfgName").value.trim(),avatar:$("cfgAvatar").value.trim()||"🤖",description:$("cfgDesc").value.trim(),provider:$("cfgProvider").value,chat_model:$("cfgChatModel").value.trim(),vision_model:$("cfgVisionModel").value.trim(),embedding_model:$("cfgEmbeddingModel").value.trim(),chat_ollama_host:$("cfgChatHost").value.trim(),embedding_host:$("cfgEmbeddingHost").value.trim(),api_base_url:$("cfgApiBaseUrl").value.trim(),api_key:$("cfgApiKey").value.trim(),analysis_enabled:$("cfgAnalysis").value==="true",memory_top_k:Number($("cfgMemoryTopK").value||20),history_limit:Number($("cfgHistoryLimit").value||20),temperature:Number($("cfgTemperature").value||.7),system_prompt:$("cfgPrompt").value};await j(`/api/roles/${state.roleId}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});state.role=await j(`/api/roles/${state.roleId}`);updateHeader();state.sessionId=keep;await loadRoles(false);toast("角色配置已保存")}
+    function openModal(v){$("roleModal").classList.toggle("open",v);if(v){$("newName").value="";$("newAvatar").value="🤖";$("newDesc").value="";$("newProvider").value="minimax";$("newChatModel").value=state.role?.chat_model||"";$("newPrompt").value=state.role?.system_prompt||""}}
+    async function createRole(){const payload={name:$("newName").value.trim(),avatar:$("newAvatar").value.trim()||"🤖",description:$("newDesc").value.trim(),provider:$("newProvider").value,chat_model:$("newChatModel").value.trim(),system_prompt:$("newPrompt").value.trim()};if(!payload.name){toast("请先填写角色名称");return}const r=await j("/api/roles",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});openModal(false);await loadRoles();await selectRole(r.id);toast("新角色已创建")}
+    function openImportModal(v){$("importModal").classList.toggle("open",v);if(v){$("importJson").value=""}}
+    async function exportRole(){if(!state.roleId)return;const data=await j(`/api/roles/${state.roleId}/export`);const text=JSON.stringify(data,null,2);if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(text);toast("角色导出 JSON 已复制到剪贴板")}else{$("importJson").value=text;openImportModal(true);toast("已生成导出 JSON")}}
+    async function submitImport(){let payload;try{payload=JSON.parse($("importJson").value)}catch(e){toast("导入 JSON 格式不正确");return}payload.overwrite=$("importOverwrite").value==="true";const res=await j("/api/roles/import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});openImportModal(false);await loadRoles();await selectRole(res.role.id);toast("角色导入成功")}
+    async function deleteRole(){if(!state.roleId||state.roleId==="default"){toast("默认角色不能删除");return}if(!confirm(`确认删除角色「${state.role?.name||state.roleId}」吗？该角色的会话、记忆和成长数据都会一起删除。`))return;await j(`/api/roles/${state.roleId}`,{method:"DELETE"});state.roleId="default";state.sessionId=null;await loadRoles();toast("角色已删除")}
+    async function loadMemories(){if(!state.roleId)return;const q=$("memoryQuery").value.trim();const url=q?`/api/roles/${state.roleId}/memories?query=${encodeURIComponent(q)}&limit=100`:`/api/roles/${state.roleId}/memories?limit=100`;const data=await j(url);renderMemories(data.items||[])}
+    function renderMemories(items){$("memoryList").innerHTML=!items.length?`<div class="model">当前角色暂无匹配记忆</div>`:items.map(m=>`<div class="model"><div style="font-weight:600;color:#1f1f1a;margin-bottom:6px">${esc(m.type||"context")} · ${(m.score??m.importance??0).toFixed?Number(m.score??m.importance??0).toFixed(2):esc(m.importance||"")}</div><div style="white-space:pre-wrap;line-height:1.5">${esc(m.content||"")}</div><div class="inline" style="margin-top:8px"><button type="button" data-edit-memory="${m.id}">编辑</button><button type="button" data-del-memory="${m.id}">删除</button></div></div>`).join("");document.querySelectorAll("[data-edit-memory]").forEach(b=>b.onclick=()=>editMemory(b.dataset.editMemory));document.querySelectorAll("[data-del-memory]").forEach(b=>b.onclick=()=>deleteMemory(b.dataset.delMemory))}
+    async function editMemory(id){const current=(await j(`/api/roles/${state.roleId}/memories?limit=100`)).items.find(m=>m.id===id);if(!current){toast("记忆不存在");return}const content=prompt("编辑记忆内容",current.content||"");if(content===null)return;const importanceText=prompt("重要度 0-1",String(current.importance??0.5));if(importanceText===null)return;await j(`/api/roles/${state.roleId}/memories/${id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({content,importance:Number(importanceText||current.importance||0.5),type:current.type,tags:current.tags||[]})});await loadMemories();toast("记忆已更新")}
+    async function deleteMemory(id){if(!confirm("确认删除这条记忆吗？"))return;await j(`/api/roles/${state.roleId}/memories/${id}`,{method:"DELETE"});await loadMemories();toast("记忆已删除")}
+    async function loadModels(host){$("modelList").innerHTML="";if(!host){toast("请先填写 Ollama 地址");return}try{const data=await j(`/api/models?host=${encodeURIComponent(host)}`);if(data.status!=="online"){$("modelList").innerHTML=`<div class="model">主机离线：${esc(data.error||"未知错误")}</div>`;return}const models=data.models||[];if(!models.length){$("modelList").innerHTML=`<div class="model">该主机没有返回可用模型</div>`;return}$("modelList").innerHTML=models.map(m=>`<button class="model" type="button" data-model="${esc(m.name||"")}">${esc(m.name||"")}</button>`).join("");document.querySelectorAll("[data-model]").forEach(b=>b.onclick=()=>{$("cfgChatModel").value=b.dataset.model})}catch(e){$("modelList").innerHTML=`<div class="model">读取模型失败：${esc(e.message)}</div>`}}
+    async function refreshAll(){const keep=state.sessionId;await checkBackend();state.sessionId=keep;await loadRoles(false);toast("已刷新")}
+    function bind(){$("apiBase").value=state.apiBase;$("newChatBtn").onclick=newSession;$("newRoleBtn").onclick=()=>openModal(true);$("closeModalBtn").onclick=()=>openModal(false);$("createRoleBtn").onclick=createRole;$("saveBtn").onclick=saveRole;$("applyApiBtn").onclick=async()=>{setApiBase();await checkBackend();await loadRoles()};$("checkBtn").onclick=checkBackend;$("refreshBtn").onclick=refreshAll;$("sendBtn").onclick=send;$("stopBtn").onclick=()=>{if(state.currentAbort)state.currentAbort.abort();else setSending(false)};$("togglePanelBtn").onclick=togglePanel;$("toggleSideBtn").onclick=toggleSide;$("loadChatModelsBtn").onclick=()=>loadModels($("cfgChatHost").value.trim());$("loadEmbeddingModelsBtn").onclick=()=>loadModels($("cfgEmbeddingHost").value.trim());$("exportRoleBtn").onclick=exportRole;$("importRoleBtn").onclick=()=>openImportModal(true);$("deleteRoleBtn").onclick=deleteRole;$("closeImportModalBtn").onclick=()=>openImportModal(false);$("submitImportBtn").onclick=submitImport;$("searchMemoryBtn").onclick=loadMemories;$("reloadMemoryBtn").onclick=()=>{$("memoryQuery").value="";loadMemories()};$("input").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}});$("input").addEventListener("input",autoSize);$("memoryQuery").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();loadMemories()}})}
+    async function init(){bind();applyLayoutState();await checkBackend();await loadRoles(true)}
+    init().catch(e=>{console.error(e);toast("初始化失败")});
+  </script>
+</body>
+</html>
