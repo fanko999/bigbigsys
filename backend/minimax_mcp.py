@@ -3,7 +3,7 @@ import subprocess
 import os
 import json
 
-UVX_PATH = r"C:\Users\Administrator\.local\bin\uvx.exe"
+UVX_PATH = os.environ.get("UVX_PATH", "uvx")
 MINIMAX_API_KEY = os.environ.get("MINIMAX_API_KEY", "")
 MINIMAX_API_HOST = os.environ.get("MINIMAX_API_HOST", "https://api.minimaxi.com")
 
@@ -67,6 +67,9 @@ if __name__ == "__main__":
     
     # Test image
     print("\n2. Image:")
-    img = r"C:\Users\Administrator\.openclaw\media\inbound\file_1---eb4eb128-7c13-4024-b3ca-da84c6f55651.jpg"
-    result = understand_image("describe this image", img)
-    print(result[:500])
+    img = os.environ.get("TEST_IMAGE_PATH", "")
+    if img:
+        result = understand_image("describe this image", img)
+        print(result[:500])
+    else:
+        print("Set TEST_IMAGE_PATH to test image understanding.")

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 import sys
 import io
+from pathlib import Path
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 import asyncio
-import sys
-sys.path.insert(0, r"C:\Users\Administrator\.openclaw\workspace\ai-web-chat\backend")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from services.memory_service import search_memories
 

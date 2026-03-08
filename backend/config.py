@@ -37,7 +37,7 @@ MODELS = {
 OLLAMA_HOSTS = {
     "local": "http://127.0.0.1:11434",
     "local_11435": "http://127.0.0.1:11435",
-    "vps": "http://45.135.162.118:7557",
+    "remote": "http://127.0.0.1:11435",
 }
 DEFAULT_OLLAMA_HOST = "local"  # 聊天用11434
 

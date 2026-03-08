@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
-sys.path.insert(0, r"C:\Users\Administrator\.openclaw\workspace\ai-web-chat\backend")
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import asyncio
 from services.memory_service import get_embedding, add_memory, search_memories
 

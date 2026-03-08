@@ -99,9 +99,12 @@ if __name__ == "__main__":
         print("=== 测试MiniMax MCP ===")
         
         # 测试看图
-        image_path = r"C:\Users\Administrator\.openclaw\media\inbound\file_1---eb4eb128-7c13-4024-b3ca-da84c6f55651.jpg"
+        image_path = os.environ.get("TEST_IMAGE_PATH", "")
+        if not image_path:
+            print("请先设置 TEST_IMAGE_PATH 环境变量")
+            return
+
         print(f"测试图片: {image_path}")
-        
         result = await understand_image(image_path, "请描述这张图片")
         print(f"\n图片理解结果:\n{result}")
     

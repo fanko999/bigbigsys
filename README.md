@@ -1,6 +1,24 @@
-# 猪猪系统
+<p align="center">
+  <img src="./assets/banner.svg" alt="猪猪系统 Banner" width="100%">
+</p>
 
-一个可长期运行的多角色 AI 聊天系统。
+<p align="center">
+  <a href="https://github.com/fanko999/bigbigsys"><img alt="repo" src="https://img.shields.io/badge/repo-bigbigsys-1f7a56?style=for-the-badge"></a>
+  <img alt="python" src="https://img.shields.io/badge/Python-3.11-blue?style=for-the-badge">
+  <img alt="fastapi" src="https://img.shields.io/badge/FastAPI-Streaming-0f766e?style=for-the-badge">
+  <img alt="frontend" src="https://img.shields.io/badge/Frontend-Vanilla_Web-bf6f00?style=for-the-badge">
+  <img alt="llm" src="https://img.shields.io/badge/LLM-MiniMax%20%7C%20Ollama-7b3fe4?style=for-the-badge">
+</p>
+
+<p align="center">
+  一个适合长期运行的多角色 AI 聊天系统。
+</p>
+
+<p align="center">
+  多角色隔离、长期记忆、流式输出、可切换模型与向量服务，前后端一体可部署。
+</p>
+
+## 为什么这套系统值钱
 
 它不是单纯的“聊天壳”，而是把以下几件事放到了一起：
 
@@ -10,6 +28,38 @@
 - 支持 MiniMax、Ollama、本地或远程 API
 - 服务端真正流式输出
 - JSON 文件落地，方便备份、迁移、调试
+
+## 核心亮点
+
+- 真正的一角色一独立记忆系统，不是前端假分组
+- 记忆、会话、成长、配置全部服务端隔离
+- 支持 MiniMax、Ollama、本地或远程 OpenAI 兼容 API
+- 已支持真正服务端流式输出，不再只是前端假打字机
+- 前端可直接运营角色、编辑 Prompt、导出导入角色与记忆
+- JSON 数据结构清晰，适合迁移、备份、长期维护
+
+## 适合什么场景
+
+- 想做长期陪伴型 AI 角色
+- 想做“一个项目里多个 AI 人设”的系统
+- 想把聊天模型和向量模型拆开部署
+- 想在本地、远程模型机、第三方 API 之间自由切换
+- 想保留可控的数据结构，而不是把状态全部黑盒化
+
+## 界面与体验
+
+- 三栏工作台布局
+- 左右栏可折叠
+- 角色与模型配置同页管理
+- 真流式输出
+- 支持中途停止生成
+- 角色级记忆管理
+
+## 系统预览
+
+当前仓库包含一张 README 封面图，用于表达整体定位和特性：
+
+![Banner](./assets/banner.svg)
 
 ## 这套系统的好处
 
