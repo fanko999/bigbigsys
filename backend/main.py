@@ -67,6 +67,13 @@ class ChatRequest(BaseModel):
     images: Optional[List[str]] = None
 
 
+class ToolRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+    role_id: Optional[str] = DEFAULT_ROLE_ID
+    images: Optional[List[str]] = None
+
+
 class SessionCreateRequest(BaseModel):
     role_id: Optional[str] = DEFAULT_ROLE_ID
     title: Optional[str] = "新对话"
@@ -297,6 +304,35 @@ def save_image_inputs(images: Optional[List[str]], role_id: Optional[str]) -> Op
         else:
             prepared.append(image)
     return prepared
+
+
+def resolve_minimax_credentials(role_config: Dict[str, Any]) -> Dict[str, str]:
+    api_key = (role_config.get("api_key") or getattr(config, "MINIMAX_API_KEY", "")).strip()
+    api_host = (role_config.get("api_base_url") or "https://api.minimaxi.com/v1").strip()
+    if api_host.endswith("/v1"):
+        api_host = api_host[:-3]
+    return {"api_key": api_key, "api_host": api_host.rstrip("/")}
+
+
+def build_tool_user_message(content: str, model_name: str, has_image: bool = False) -> Dict[str, Any]:
+    return {
+        "id": generate_id(),
+        "role": "user",
+        "content": content,
+        "timestamp": datetime.now().isoformat(),
+        "model": model_name,
+        "has_image": has_image,
+    }
+
+
+def build_tool_assistant_message(content: str, model_name: str) -> Dict[str, Any]:
+    return {
+        "id": generate_id(),
+        "role": "assistant",
+        "content": content,
+        "timestamp": datetime.now().isoformat(),
+        "model": model_name,
+    }
 
 
 def rebuild_memory_index_safe():
@@ -733,6 +769,84 @@ async def chat_stream(request: ChatRequest):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@app.post("/api/tools/web-search")
+async def tool_web_search(request: ToolRequest):
+    role_id = slugify_role_id(request.role_id or DEFAULT_ROLE_ID)
+    with role_scope(role_id) as role_config:
+        from minimax_mcp import web_search
+
+        creds = resolve_minimax_credentials(role_config)
+        if not creds["api_key"]:
+            raise HTTPException(status_code=400, detail="未配置 MiniMax API Key，无法使用网搜")
+
+        session = get_session(request.session_id, role_id) if request.session_id else None
+        if not session:
+            session = create_empty_session(role_id)
+
+        label = f"[网搜] {request.message.strip()}"
+        maybe_update_session_title(session, label)
+        user_message = build_tool_user_message(label, "MCP Web Search")
+        session["messages"].append(user_message)
+
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            web_search,
+            request.message,
+            creds["api_key"],
+            creds["api_host"],
+        )
+        response_text = sanitize_assistant_output(result)
+        assistant_message = build_tool_assistant_message(response_text, "MCP Web Search")
+        session["messages"].append(assistant_message)
+        session["updated_at"] = datetime.now().isoformat()
+        save_session(session, role_id)
+        return {"session": session, "message": assistant_message, "role_id": role_id, "tool": "web_search"}
+
+
+@app.post("/api/tools/understand-image")
+async def tool_understand_image(request: ToolRequest):
+    role_id = slugify_role_id(request.role_id or DEFAULT_ROLE_ID)
+    with role_scope(role_id) as role_config:
+        from minimax_mcp import understand_image
+
+        creds = resolve_minimax_credentials(role_config)
+        if not creds["api_key"]:
+            raise HTTPException(status_code=400, detail="未配置 MiniMax API Key，无法使用 MCP 看图")
+        if not request.images:
+            raise HTTPException(status_code=400, detail="请至少上传一张图片")
+
+        prepared_images = save_image_inputs(request.images, role_id)
+        if not prepared_images:
+            raise HTTPException(status_code=400, detail="图片处理失败")
+
+        session = get_session(request.session_id, role_id) if request.session_id else None
+        if not session:
+            session = create_empty_session(role_id)
+
+        prompt = request.message.strip() or "请描述这张图片"
+        label = f"[看图] {prompt}"
+        maybe_update_session_title(session, label)
+        user_message = build_tool_user_message(label, "MCP Image", has_image=True)
+        session["messages"].append(user_message)
+
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            understand_image,
+            prompt,
+            prepared_images[0],
+            creds["api_key"],
+            creds["api_host"],
+        )
+        response_text = sanitize_assistant_output(result)
+        assistant_message = build_tool_assistant_message(response_text, "MCP Image")
+        session["messages"].append(assistant_message)
+        session["updated_at"] = datetime.now().isoformat()
+        save_session(session, role_id)
+        return {"session": session, "message": assistant_message, "role_id": role_id, "tool": "understand_image"}
 
 
 @app.get("/api/roles/{role_id}/memories")
