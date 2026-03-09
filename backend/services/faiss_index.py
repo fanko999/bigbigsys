@@ -8,6 +8,7 @@ import faiss
 import numpy as np
 
 from role_context import ensure_role_storage
+from services.memory_service import load_memories
 
 
 def _paths():
@@ -46,8 +47,7 @@ def build_index():
     if not paths["memory_file"].exists():
         return
 
-    with open(paths["memory_file"], "r", encoding="utf-8") as f:
-        memories = json.load(f)
+    memories = load_memories()
     if not memories:
         return
 

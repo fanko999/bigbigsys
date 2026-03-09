@@ -21,9 +21,11 @@ from role_context import (
     DEFAULT_ROLE_ID,
     ensure_role_storage,
     get_role_paths,
+    load_global_model_config,
     list_roles,
     load_role_config,
     normalize_role_id,
+    persist_global_model_config,
     role_scope,
     slugify_role_id,
     upsert_role,
@@ -97,6 +99,23 @@ class RolePayload(BaseModel):
     memory_top_k: Optional[int] = None
     history_limit: Optional[int] = None
     temperature: Optional[float] = None
+    archive_all_messages: Optional[bool] = None
+
+
+class GlobalModelSettingsPayload(BaseModel):
+    provider: Optional[str] = None
+    chat_model: Optional[str] = None
+    vision_model: Optional[str] = None
+    embedding_model: Optional[str] = None
+    chat_ollama_host: Optional[str] = None
+    embedding_host: Optional[str] = None
+    api_base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    analysis_enabled: Optional[bool] = None
+    memory_top_k: Optional[int] = None
+    history_limit: Optional[int] = None
+    temperature: Optional[float] = None
+    archive_all_messages: Optional[bool] = None
 
 
 class RoleImportPayload(BaseModel):
@@ -163,6 +182,14 @@ def maybe_update_session_title(session: Dict[str, Any], user_message: str) -> No
         session["title"] = cleaned[:28]
 
 
+def is_internal_analysis_text(text: str) -> bool:
+    content = (text or "").strip()
+    if not content:
+        return False
+    markers = ["关系类型：", "用户目的：", "用户状态推测：", "置信度：", "关联历史：", "说明："]
+    return all(marker in content for marker in markers)
+
+
 def build_history_text(messages: List[Dict[str, Any]], limit: int) -> str:
     lines = []
     recent_msgs = messages[-limit:]
@@ -170,6 +197,8 @@ def build_history_text(messages: List[Dict[str, Any]], limit: int) -> str:
         role = "用户" if msg.get("role") == "user" else "AI"
         content = (msg.get("content") or "").strip()
         if not content:
+            continue
+        if is_internal_analysis_text(content):
             continue
         # Filter out earlier hallucinated assistant replies about "empty messages"
         # so they do not keep poisoning later turns.
@@ -179,7 +208,7 @@ def build_history_text(messages: List[Dict[str, Any]], limit: int) -> str:
     return "\n".join(lines)
 
 
-def build_analysis_prompt(message: str, history_text: str) -> str:
+def build_analysis_prompt(message: str, history_text: str, web_search_summary: str = "") -> str:
     return f"""你是一个对话分析助手。请分析以下对话信息，输出结构化的分析结果。
 
 一、用户当前消息：
@@ -187,6 +216,9 @@ def build_analysis_prompt(message: str, history_text: str) -> str:
 
 二、当前对话历史信息（最近20条）：
 {history_text or "(暂无历史)"}
+
+三、网搜摘要（如果触发了网搜）：
+{web_search_summary or "(未触发网搜或无结果)"}
 
 请分析以下内容（只输出分析结果，不要有其他内容）：
 1. 用户当前消息与历史对话的逻辑关系是什么？（如：延续话题、切换话题、问答、无关）
@@ -204,39 +236,138 @@ def build_analysis_prompt(message: str, history_text: str) -> str:
 """
 
 
+WEB_SEARCH_TRIGGER_PATTERNS = (
+    "最新新闻",
+    "最新消息",
+    "最新报道",
+    "最近几天报道",
+    "最近几天消息",
+    "最近网上",
+    "这二天网上",
+    "这两天网上",
+    "帮我网上查查",
+    "网上看下",
+    "网上查下",
+    "帮我查下最新",
+    "帮我搜下最新",
+    "查查最新",
+    "搜搜最新",
+)
+
+
+def should_trigger_web_search(message: str) -> bool:
+    content = (message or "").strip()
+    if not content:
+        return False
+    lowered = content.lower()
+    if any(pattern in content for pattern in WEB_SEARCH_TRIGGER_PATTERNS):
+        return True
+    keyword_groups = [
+        ("最新", "新闻"),
+        ("最新", "消息"),
+        ("最新", "报道"),
+        ("最近", "新闻"),
+        ("最近", "消息"),
+        ("网上", "查"),
+        ("网上", "搜"),
+        ("网搜", ""),
+    ]
+    for left, right in keyword_groups:
+        if left in content and (not right or right in content):
+            return True
+    return "latest" in lowered and ("news" in lowered or "report" in lowered)
+
+
+async def maybe_fetch_web_search_summary(role_config: Dict[str, Any], user_message: str) -> str:
+    if not should_trigger_web_search(user_message):
+        return ""
+
+    role_name = (role_config.get("name") or "这个角色").strip()
+    creds = resolve_minimax_credentials(role_config)
+    if not creds["api_key"]:
+        return f"{role_name}无法搜找网络，没办法获取最新消息哦。"
+
+    try:
+        from minimax_mcp import web_search
+
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            web_search,
+            user_message,
+            creds["api_key"],
+            creds["api_host"],
+        )
+        summary = sanitize_assistant_output(result)
+        if not summary or "处理失败" in summary or "搜索失败" in summary:
+            return f"{role_name}尝试了网搜，但这次没拿到可靠结果哦。"
+        return summary[:4000]
+    except Exception:
+        return f"{role_name}无法搜找网络，没办法获取最新消息哦。"
+
+
 def build_structured_system_prompt(
     role_config: Dict[str, Any],
     user_message: str,
     analysis_result: str,
+    web_search_summary: str,
     history_text: str,
     memory_items: List[Dict[str, Any]],
+    belief_context: str,
+    user_profile_context: str,
+    conflict_guard_text: str,
 ) -> str:
     parts = [role_config.get("system_prompt", config.SYSTEM_PROMPT).strip()]
     parts.append(f"一、【用户当前消息】\n{user_message}")
     parts.append(f"二、【分析现状结果】\n{analysis_result or '未分析'}")
-    parts.append(f"三、【当前对话历史信息】\n{history_text or '(暂无历史)'}")
+    parts.append(f"三、【网搜摘要】\n{web_search_summary or '(当前未触发网搜)'}")
+    parts.append(f"四、【当前对话历史信息】\n{history_text or '(暂无历史)'}")
+    parts.append(f"五、【结构化事实判断】\n{belief_context or '(暂无结构化事实候选)'}")
+    parts.append(f"六、【用户表达画像】\n{user_profile_context or '(暂无用户画像)'}")
+    parts.append(f"七、【冲突字段守卫】\n{conflict_guard_text or '(暂无冲突字段)'}")
 
     if memory_items:
         memory_lines = []
         for idx, mem in enumerate(memory_items, 1):
             time_info = mem.get("created_at", "")
             memory_lines.append(f"{idx}. [{mem.get('score', 0):.2f}] {mem.get('content', '')} (time={time_info})")
-        parts.append("四、【相关长期记忆】\n" + "\n".join(memory_lines))
+        parts.append("八、【相关长期记忆】\n" + "\n".join(memory_lines))
     else:
-        parts.append("四、【相关长期记忆】\n(暂无命中)")
+        parts.append("八、【相关长期记忆】\n(暂无命中)")
 
     parts.append(
         "【回答规则】\n"
         "1. 优先回答当前消息。\n"
         "2. 分析结果只作为内部参考，不向用户展示。\n"
         "3. 用户状态和置信度只影响语气，不影响事实判断。\n"
-        "4. 如与历史有关联，可引用对话历史中的具体信息。\n"
-        "5. 必要时再引用长期记忆，不要强行硬套。\n"
-        "6. 回答保持自然、简洁、清楚。\n"
-        "7. 只有当【用户当前消息】在去掉空格和换行后确实为空时，才可以说用户发了空消息。\n"
-        "8. 如果【用户当前消息】里有实际文字内容，严禁回答用户发了空消息、没说话、空白消息。"
+        "4. 如果结构化事实判断里标记了【谨慎信息】或信息不稳定，禁止把该信息说成确定事实。\n"
+        "5. 对 conflicted/unstable 的字段，只能回答“存在冲突、我不敢确定、需要你再确认”，不能直接选一个值当最终答案。\n"
+        "6. 如果【冲突字段守卫】中列出了某个字段，回答涉及该字段时必须先说明存在冲突，再请用户确认。\n"
+        "7. 如果用户表达画像显示其常夸张、玩笑或测试系统，不要把这类说法直接当硬事实。\n"
+        "8. 如果【网搜摘要】不为空，优先把网搜摘要当作时效性信息来源；如果网搜摘要明确表示无法获取最新消息，就要如实告诉用户。\n"
+        "9. 如与历史有关联，可引用对话历史中的具体信息。\n"
+        "10. 必要时再引用长期记忆，不要强行硬套。\n"
+        "11. 回答保持自然、简洁、清楚。\n"
+        "12. 只有当【用户当前消息】在去掉空格和换行后确实为空时，才可以说用户发了空消息。\n"
+        "13. 如果【用户当前消息】里有实际文字内容，严禁回答用户发了空消息、没说话、空白消息。"
     )
     return "\n\n".join(parts)
+
+
+def build_conflict_guard_text(beliefs: Dict[str, Any]) -> str:
+    slots = beliefs.get("slots", {}) if beliefs else {}
+    lines: List[str] = []
+    for slot_entry in slots.values():
+        summary = slot_entry.get("summary", {})
+        if summary.get("status") not in ("conflicted", "unstable"):
+            continue
+        label = slot_entry.get("label", slot_entry.get("slot", "字段"))
+        values = summary.get("candidate_values", [])
+        if values:
+            lines.append(f"- {label}: 存在冲突值 {' / '.join(values[:5])}，禁止当成确定事实回答。")
+        else:
+            lines.append(f"- {label}: 存在冲突，禁止当成确定事实回答。")
+    return "\n".join(lines) if lines else "(暂无冲突字段)"
 
 
 def sanitize_assistant_output(text: str) -> str:
@@ -264,25 +395,34 @@ def sse_event(event: str, data: Dict[str, Any]) -> str:
 
 
 def detect_correction(message: str) -> Optional[Dict[str, str]]:
+    content = (message or "").strip()
     patterns = [
         r"其实我(?:不|没)(?:是|喜欢|想|要)",
-        r"记错了[，,]+(?:是|我)",
-        r"纠正一下[，,]+",
-        r"不是(?:的|吧|啦|哈)",
+        r"记错了",
+        r"纠正一下",
+        r"不是",
         r"(?:不|没)(?:对|是|吧)",
         r"重新说(?:一下|)",
-        r"错了[，,]+(?:是|我)",
+        r"错了",
     ]
-    if not any(re.search(pattern, message) for pattern in patterns):
+    if not any(re.search(pattern, content) for pattern in patterns):
         return None
 
-    new_match = re.search(r"[是到为](.+?)(?:。|$)", message)
-    if not new_match:
-        return {"old": message, "new": message}
+    explicit_replace = re.search(r"不是(.+?)[，,\s]*是(.+?)(?:。|$)", content)
+    if explicit_replace:
+        return {"old": explicit_replace.group(1).strip(), "new": explicit_replace.group(2).strip()}
 
-    old_match = re.search(r"(?:不是|不喜欢|没说)(.+?)[，,]", message)
+    explicit_fix = re.search(r"(?:纠正一下|记错了|重新说一下|错了)[，,:：\s]*(.+?)(?:。|$)", content)
+    if explicit_fix:
+        return {"old": content, "new": explicit_fix.group(1).strip()}
+
+    new_match = re.search(r"(?:是|改成|应该是|其实是)(.+?)(?:。|$)", content)
+    if not new_match:
+        return {"old": content, "new": content}
+
+    old_match = re.search(r"(?:不是|不喜欢|没说)(.+?)[，,]", content)
     return {
-        "old": old_match.group(1).strip() if old_match else message,
+        "old": old_match.group(1).strip() if old_match else content,
         "new": new_match.group(1).strip(),
     }
 
@@ -312,6 +452,26 @@ def resolve_minimax_credentials(role_config: Dict[str, Any]) -> Dict[str, str]:
     if api_host.endswith("/v1"):
         api_host = api_host[:-3]
     return {"api_key": api_key, "api_host": api_host.rstrip("/")}
+
+
+def model_supports_vision(model_name: str) -> bool:
+    name = (model_name or "").strip().lower()
+    if not name:
+        return False
+    keywords = (
+        "vl",
+        "vision",
+        "llava",
+        "qwen2.5-vl",
+        "qwen3-vl",
+        "gpt-4o",
+        "gpt-4.1",
+        "gemini",
+        "glm-4v",
+        "minicpm-v",
+        "internvl",
+    )
+    return any(keyword in name for keyword in keywords)
 
 
 def build_tool_user_message(content: str, model_name: str, has_image: bool = False) -> Dict[str, Any]:
@@ -344,6 +504,54 @@ def rebuild_memory_index_safe():
         print(f"[Faiss] 跳过索引重建: {e}")
 
 
+async def persist_chat_memories(
+    add_memory,
+    role_config: Dict[str, Any],
+    session_id: str,
+    user_text: str,
+    assistant_text: str,
+    user_label: str,
+) -> None:
+    if not role_config.get("archive_all_messages", True):
+        return
+
+    common_tags = [f"session:{session_id}", "source:chat"]
+    if user_text.strip() and not is_internal_analysis_text(user_text):
+        await add_memory(
+            user_text,
+            memory_type="context",
+            importance=_user_memory_importance(user_label),
+            tags=common_tags + ["role:user"],
+            auto_detect=False,
+            force=True,
+            dedupe=False,
+            metadata={"source": "chat", "role": "user", "session_id": session_id, "utterance_label": user_label},
+        )
+    if assistant_text.strip() and not is_internal_analysis_text(assistant_text):
+        await add_memory(
+            assistant_text,
+            memory_type="context",
+            importance=0.35,
+            tags=common_tags + ["role:assistant"],
+            auto_detect=False,
+            force=True,
+            dedupe=False,
+            metadata={"source": "chat", "role": "assistant", "session_id": session_id},
+        )
+
+
+def _user_memory_importance(user_label: str) -> float:
+    mapping = {
+        "factual": 0.55,
+        "uncertain": 0.4,
+        "emotional": 0.45,
+        "humorous": 0.3,
+        "exaggerated": 0.2,
+        "test_behavior": 0.25,
+    }
+    return mapping.get(user_label, 0.35)
+
+
 def export_role_bundle(role_id: str) -> Dict[str, Any]:
     role_id = slugify_role_id(role_id)
     paths = ensure_role_storage(role_id)
@@ -354,6 +562,7 @@ def export_role_bundle(role_id: str) -> Dict[str, Any]:
         "data": {
             "sessions": [],
             "memories": [],
+            "beliefs": {},
             "growth": {},
         },
     }
@@ -366,6 +575,10 @@ def export_role_bundle(role_id: str) -> Dict[str, Any]:
     if memory_file.exists():
         with open(memory_file, "r", encoding="utf-8") as f:
             bundle["data"]["memories"] = json.load(f)
+    beliefs_file = paths["memory"] / "beliefs.json"
+    if beliefs_file.exists():
+        with open(beliefs_file, "r", encoding="utf-8") as f:
+            bundle["data"]["beliefs"] = json.load(f)
 
     growth = {}
     for name in ("personality.json", "growth_log.json", "stats.json"):
@@ -412,6 +625,11 @@ def import_role_bundle(payload: RoleImportPayload) -> Dict[str, Any]:
         memory_file = paths["memory"] / "memories.json"
         with open(memory_file, "w", encoding="utf-8") as f:
             json.dump(memories, f, ensure_ascii=False, indent=2)
+    beliefs = payload.data.get("beliefs")
+    if beliefs is not None:
+        beliefs_file = paths["memory"] / "beliefs.json"
+        with open(beliefs_file, "w", encoding="utf-8") as f:
+            json.dump(beliefs, f, ensure_ascii=False, indent=2)
 
     growth = payload.data.get("growth", {})
     for name, data in growth.items():
@@ -501,6 +719,17 @@ async def get_config(role_id: str = Query(DEFAULT_ROLE_ID)):
     }
 
 
+@app.get("/api/global-settings")
+async def api_get_global_settings():
+    return load_global_model_config()
+
+
+@app.put("/api/global-settings")
+async def api_update_global_settings(payload: GlobalModelSettingsPayload):
+    settings = payload.model_dump(exclude_none=True)
+    return persist_global_model_config(settings)
+
+
 @app.post("/api/config")
 async def set_config(config_data: Dict[str, Any], role_id: str = Query(DEFAULT_ROLE_ID)):
     updated = upsert_role(config_data, role_id)
@@ -551,6 +780,18 @@ async def chat(request: ChatRequest):
     with role_scope(role_id) as role_config:
         from services.memory_service import add_memory, correct_memory, search_memories
         from services.personality_service import maybe_grow, record_interaction
+        from services.belief_service import (
+            correct_beliefs_from_text,
+            get_belief_context_text,
+            load_beliefs,
+            update_beliefs_from_text,
+        )
+        from services.utterance_service import (
+            classify_utterance,
+            get_user_profile_context_text,
+            should_promote_to_fact,
+            update_user_profile,
+        )
 
         session = get_session(request.session_id, role_id) if request.session_id else None
         if not session:
@@ -566,6 +807,8 @@ async def chat(request: ChatRequest):
             "has_image": bool(request.images),
         }
         session["messages"].append(user_message)
+        utterance_info = classify_utterance(request.message)
+        update_user_profile(utterance_info, request.message)
 
         history_limit = int(role_config.get("history_limit", 20) or 20)
         recent_history = session["messages"][:-1][-history_limit:]
@@ -575,10 +818,20 @@ async def chat(request: ChatRequest):
         memories = await search_memories(request.message, top_k=memory_top_k)
         filtered_memories = [mem for mem in memories if mem.get("score", 0) > 0.25 and "？" not in mem.get("content", "")]
         filtered_memories = filtered_memories[:memory_top_k]
+        await update_beliefs_from_text(
+            request.message,
+            session_id=session["id"],
+            allow_promote=should_promote_to_fact(utterance_info["label"]),
+        )
+        beliefs_data = load_beliefs()
+        belief_context = get_belief_context_text()
+        conflict_guard_text = build_conflict_guard_text(beliefs_data)
+        user_profile_context = get_user_profile_context_text()
+        web_search_summary = await maybe_fetch_web_search_summary(role_config, request.message)
 
         analysis_result = "未启用分析"
         if role_config.get("analysis_enabled", True):
-            analysis_prompt = build_analysis_prompt(request.message, history_text)
+            analysis_prompt = build_analysis_prompt(request.message, history_text, web_search_summary)
             analysis_result = await generate_chat_response(
                 role_config=role_config,
                 message=analysis_prompt,
@@ -592,8 +845,12 @@ async def chat(request: ChatRequest):
             role_config=role_config,
             user_message=request.message,
             analysis_result=analysis_result,
+            web_search_summary=web_search_summary,
             history_text=history_text,
             memory_items=filtered_memories,
+            belief_context=belief_context,
+            user_profile_context=user_profile_context,
+            conflict_guard_text=conflict_guard_text,
         )
         prepared_images = save_image_inputs(request.images, role_id)
         response_text = await generate_chat_response(
@@ -613,11 +870,16 @@ async def chat(request: ChatRequest):
         if correction:
             corrected = await correct_memory(correction["old"], correction["new"])
             if corrected:
+                await correct_beliefs_from_text(correction["old"], correction["new"], session_id=session["id"])
                 response_text += "\n\n[已纠正记忆]"
-            else:
-                await add_memory(request.message, force=True)
-        elif len(request.message) > 3:
-            await add_memory(request.message, force=True)
+        await persist_chat_memories(
+            add_memory=add_memory,
+            role_config=role_config,
+            session_id=session["id"],
+            user_text=request.message,
+            assistant_text=response_text,
+            user_label=utterance_info["label"],
+        )
         rebuild_memory_index_safe()
 
         assistant_message = {
@@ -645,6 +907,18 @@ async def chat_stream(request: ChatRequest):
         with role_scope(role_id) as role_config:
             from services.memory_service import add_memory, correct_memory, search_memories
             from services.personality_service import maybe_grow, record_interaction
+            from services.belief_service import (
+                correct_beliefs_from_text,
+                get_belief_context_text,
+                load_beliefs,
+                update_beliefs_from_text,
+            )
+            from services.utterance_service import (
+                classify_utterance,
+                get_user_profile_context_text,
+                should_promote_to_fact,
+                update_user_profile,
+            )
 
             session = get_session(request.session_id, role_id) if request.session_id else None
             if not session:
@@ -660,6 +934,8 @@ async def chat_stream(request: ChatRequest):
                 "has_image": bool(request.images),
             }
             session["messages"].append(user_message)
+            utterance_info = classify_utterance(request.message)
+            update_user_profile(utterance_info, request.message)
 
             history_limit = int(role_config.get("history_limit", 20) or 20)
             recent_history = session["messages"][:-1][-history_limit:]
@@ -669,10 +945,20 @@ async def chat_stream(request: ChatRequest):
             memories = await search_memories(request.message, top_k=memory_top_k)
             filtered_memories = [mem for mem in memories if mem.get("score", 0) > 0.25 and "？" not in mem.get("content", "")]
             filtered_memories = filtered_memories[:memory_top_k]
+            await update_beliefs_from_text(
+                request.message,
+                session_id=session["id"],
+                allow_promote=should_promote_to_fact(utterance_info["label"]),
+            )
+            beliefs_data = load_beliefs()
+            belief_context = get_belief_context_text()
+            conflict_guard_text = build_conflict_guard_text(beliefs_data)
+            user_profile_context = get_user_profile_context_text()
+            web_search_summary = await maybe_fetch_web_search_summary(role_config, request.message)
 
             analysis_result = "未启用分析"
             if role_config.get("analysis_enabled", True):
-                analysis_prompt = build_analysis_prompt(request.message, history_text)
+                analysis_prompt = build_analysis_prompt(request.message, history_text, web_search_summary)
                 analysis_result = await generate_chat_response(
                     role_config=role_config,
                     message=analysis_prompt,
@@ -686,8 +972,12 @@ async def chat_stream(request: ChatRequest):
                 role_config=role_config,
                 user_message=request.message,
                 analysis_result=analysis_result,
+                web_search_summary=web_search_summary,
                 history_text=history_text,
                 memory_items=filtered_memories,
+                belief_context=belief_context,
+                user_profile_context=user_profile_context,
+                conflict_guard_text=conflict_guard_text,
             )
             prepared_images = save_image_inputs(request.images, role_id)
             assistant_message = {
@@ -738,11 +1028,16 @@ async def chat_stream(request: ChatRequest):
             if correction:
                 corrected = await correct_memory(correction["old"], correction["new"])
                 if corrected:
+                    await correct_beliefs_from_text(correction["old"], correction["new"], session_id=session["id"])
                     final_response += "\n\n[已纠正记忆]"
-                else:
-                    await add_memory(request.message, force=True)
-            elif len(request.message) > 3:
-                await add_memory(request.message, force=True)
+            await persist_chat_memories(
+                add_memory=add_memory,
+                role_config=role_config,
+                session_id=session["id"],
+                user_text=request.message,
+                assistant_text=final_response,
+                user_label=utterance_info["label"],
+            )
             rebuild_memory_index_safe()
 
             assistant_message["content"] = final_response
@@ -812,9 +1107,6 @@ async def tool_understand_image(request: ToolRequest):
     with role_scope(role_id) as role_config:
         from minimax_mcp import understand_image
 
-        creds = resolve_minimax_credentials(role_config)
-        if not creds["api_key"]:
-            raise HTTPException(status_code=400, detail="未配置 MiniMax API Key，无法使用 MCP 看图")
         if not request.images:
             raise HTTPException(status_code=400, detail="请至少上传一张图片")
 
@@ -822,27 +1114,61 @@ async def tool_understand_image(request: ToolRequest):
         if not prepared_images:
             raise HTTPException(status_code=400, detail="图片处理失败")
 
+        creds = resolve_minimax_credentials(role_config)
+        prompt = request.message.strip() or "请描述这张图片"
+        primary_chat_model = role_config.get("chat_model", "")
+        vision_model = role_config.get("vision_model", "")
+
         session = get_session(request.session_id, role_id) if request.session_id else None
         if not session:
             session = create_empty_session(role_id)
 
-        prompt = request.message.strip() or "请描述这张图片"
         label = f"[看图] {prompt}"
         maybe_update_session_title(session, label)
         user_message = build_tool_user_message(label, "MCP Image", has_image=True)
         session["messages"].append(user_message)
 
         loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            None,
-            understand_image,
-            prompt,
-            prepared_images[0],
-            creds["api_key"],
-            creds["api_host"],
-        )
+        result = ""
+        used_model = "MCP Image"
+
+        if model_supports_vision(primary_chat_model):
+            result = await generate_chat_response(
+                role_config=role_config,
+                message=prompt,
+                history=[],
+                system_prompt=role_config.get("system_prompt", config.SYSTEM_PROMPT),
+                images=prepared_images,
+                model_override=primary_chat_model,
+            )
+            used_model = primary_chat_model or "主聊天模型"
+        elif creds["api_key"]:
+            result = await loop.run_in_executor(
+                None,
+                understand_image,
+                prompt,
+                prepared_images[0],
+                creds["api_key"],
+                creds["api_host"],
+            )
+            used_model = "MiniMax Vision"
+        elif vision_model:
+            fallback_role_config = {**role_config, "chat_model": vision_model}
+            result = await generate_chat_response(
+                role_config=fallback_role_config,
+                message=prompt,
+                history=[],
+                system_prompt=role_config.get("system_prompt", config.SYSTEM_PROMPT),
+                images=prepared_images,
+                model_override=vision_model,
+            )
+            used_model = vision_model
+        else:
+            role_name = role_config.get("name") or "这个角色"
+            raise HTTPException(status_code=400, detail=f"{role_name}当前没有可用的看图模型")
+
         response_text = sanitize_assistant_output(result)
-        assistant_message = build_tool_assistant_message(response_text, "MCP Image")
+        assistant_message = build_tool_assistant_message(response_text, used_model)
         session["messages"].append(assistant_message)
         session["updated_at"] = datetime.now().isoformat()
         save_session(session, role_id)
@@ -861,6 +1187,28 @@ async def api_list_role_memories(
         if query:
             return {"items": await search_memories(query, top_k=limit)}
         return {"items": await get_all_memories(limit=limit)}
+
+
+@app.get("/api/roles/{role_id}/beliefs")
+async def api_get_role_beliefs(role_id: str):
+    with role_scope(role_id):
+        from services.belief_service import get_belief_context_text, load_beliefs
+
+        return {
+            "beliefs": load_beliefs(),
+            "context": get_belief_context_text(),
+        }
+
+
+@app.get("/api/roles/{role_id}/profile")
+async def api_get_role_profile(role_id: str):
+    with role_scope(role_id):
+        from services.utterance_service import get_user_profile_context_text, load_user_profile
+
+        return {
+            "profile": load_user_profile(),
+            "context": get_user_profile_context_text(),
+        }
 
 
 @app.put("/api/roles/{role_id}/memories/{memory_id}")

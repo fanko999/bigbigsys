@@ -13,8 +13,24 @@ BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / "data"
 ROLES_DIR = DATA_DIR / "roles"
 ROLE_META_FILE = DATA_DIR / "roles.json"
+GLOBAL_MODEL_CONFIG_FILE = DATA_DIR / "global_model_config.json"
 
 DEFAULT_ROLE_ID = "default"
+GLOBAL_SETTING_KEYS = {
+    "provider",
+    "chat_model",
+    "vision_model",
+    "embedding_model",
+    "chat_ollama_host",
+    "embedding_host",
+    "api_base_url",
+    "api_key",
+    "analysis_enabled",
+    "memory_top_k",
+    "history_limit",
+    "temperature",
+    "archive_all_messages",
+}
 
 _current_role_id: ContextVar[str] = ContextVar("current_role_id", default=DEFAULT_ROLE_ID)
 _current_role_config: ContextVar[Optional[Dict[str, Any]]] = ContextVar("current_role_config", default=None)
@@ -54,7 +70,13 @@ def build_default_role_config() -> Dict[str, Any]:
         "memory_top_k": 20,
         "history_limit": 20,
         "temperature": 0.7,
+        "archive_all_messages": True,
     }
+
+
+def build_default_global_model_config() -> Dict[str, Any]:
+    role_defaults = build_default_role_config()
+    return {key: deepcopy(role_defaults.get(key)) for key in GLOBAL_SETTING_KEYS}
 
 
 def get_role_paths(role_id: Optional[str] = None) -> Dict[str, Path]:
@@ -106,6 +128,36 @@ def save_roles_index(items: List[Dict[str, Any]]) -> None:
         json.dump(items, f, ensure_ascii=False, indent=2)
 
 
+def load_global_model_config() -> Dict[str, Any]:
+    defaults = build_default_global_model_config()
+    if GLOBAL_MODEL_CONFIG_FILE.exists():
+        try:
+            with open(GLOBAL_MODEL_CONFIG_FILE, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+            if isinstance(saved, dict):
+                return {**defaults, **{k: v for k, v in saved.items() if k in GLOBAL_SETTING_KEYS}}
+        except Exception:
+            pass
+    default_role_config_file = get_role_paths(DEFAULT_ROLE_ID)["config"]
+    if default_role_config_file.exists():
+        try:
+            with open(default_role_config_file, "r", encoding="utf-8") as f:
+                saved_default = json.load(f)
+            if isinstance(saved_default, dict):
+                return {**defaults, **{k: v for k, v in saved_default.items() if k in GLOBAL_SETTING_KEYS}}
+        except Exception:
+            pass
+    return defaults
+
+
+def persist_global_model_config(settings: Dict[str, Any]) -> Dict[str, Any]:
+    merged = {**load_global_model_config(), **{k: v for k, v in settings.items() if k in GLOBAL_SETTING_KEYS}}
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(GLOBAL_MODEL_CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(merged, f, ensure_ascii=False, indent=2)
+    return merged
+
+
 def persist_role_config(role_config: Dict[str, Any]) -> Dict[str, Any]:
     rid = normalize_role_id(
         role_config.get("id"),
@@ -136,17 +188,18 @@ def persist_role_config(role_config: Dict[str, Any]) -> Dict[str, Any]:
 def load_role_config(role_id: Optional[str] = None) -> Dict[str, Any]:
     rid = slugify_role_id(role_id or get_current_role_id())
     default_config = build_default_role_config()
+    global_model_config = load_global_model_config()
     if rid == DEFAULT_ROLE_ID:
         paths = ensure_role_storage(rid)
         if paths["config"].exists():
             try:
                 with open(paths["config"], "r", encoding="utf-8") as f:
                     saved = json.load(f)
-                merged = {**default_config, **saved, "id": DEFAULT_ROLE_ID}
+                merged = {**default_config, **saved, **global_model_config, "id": DEFAULT_ROLE_ID}
                 return merged
             except Exception:
-                return default_config
-        return default_config
+                return {**default_config, **global_model_config}
+        return {**default_config, **global_model_config}
 
     paths = ensure_role_storage(rid)
     if not paths["config"].exists():
@@ -155,17 +208,18 @@ def load_role_config(role_id: Optional[str] = None) -> Dict[str, Any]:
 
     with open(paths["config"], "r", encoding="utf-8") as f:
         saved = json.load(f)
-    merged = {**default_config, **saved, "id": rid}
+    merged = {**default_config, **saved, **global_model_config, "id": rid}
     return merged
 
 
 def list_roles() -> List[Dict[str, Any]]:
+    global_settings = load_global_model_config()
     default_summary = {
         "id": DEFAULT_ROLE_ID,
         "name": build_default_role_config()["name"],
         "avatar": "🐷",
         "description": "默认猪猪角色",
-        "provider": build_default_role_config()["provider"],
+        "provider": global_settings.get("provider", build_default_role_config()["provider"]),
     }
     indexed = load_roles_index()
     found = [default_summary]

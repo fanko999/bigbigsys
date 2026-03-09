@@ -33,6 +33,7 @@ def _memory_paths() -> Dict[str, Path]:
         "file": memory_file,
         "index": memory_dir / "memory.index",
         "ids": memory_dir / "memory_ids.json",
+        "quarantine": memory_dir / "memories_quarantine.json",
     }
 
 
@@ -49,6 +50,24 @@ def load_memories() -> List[Dict[str, Any]]:
 def save_memories(memories: List[Dict[str, Any]]) -> None:
     memory_file = _memory_paths()["file"]
     with open(memory_file, "w", encoding="utf-8") as f:
+        json.dump(memories, f, ensure_ascii=False, indent=2)
+
+
+def load_quarantined_memories() -> List[Dict[str, Any]]:
+    quarantine_file = _memory_paths()["quarantine"]
+    if not quarantine_file.exists():
+        return []
+    try:
+        with open(quarantine_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def save_quarantined_memories(memories: List[Dict[str, Any]]) -> None:
+    quarantine_file = _memory_paths()["quarantine"]
+    with open(quarantine_file, "w", encoding="utf-8") as f:
         json.dump(memories, f, ensure_ascii=False, indent=2)
 
 
@@ -101,11 +120,122 @@ def get_memory_type(content: str) -> tuple[str, float]:
     return ("context", 0.5)
 
 
+def is_dirty_memory(mem: Dict[str, Any]) -> bool:
+    content = (mem.get("content") or "").strip()
+    metadata = mem.get("metadata", {}) or {}
+    role = metadata.get("role", "")
+
+    if not content or len(content) < 4:
+        return True
+    if "????" in content or "�" in content:
+        return True
+    if "<think>" in content.lower() or "```think" in content.lower():
+        return True
+    if "空消息" in content:
+        return True
+    if role == "assistant" and ("乱码" in content or "显示不完全" in content):
+        return True
+    return False
+
+
+async def quarantine_dirty_memories() -> Dict[str, Any]:
+    memories = load_memories()
+    kept: List[Dict[str, Any]] = []
+    moved: List[Dict[str, Any]] = []
+    now = str(int(time.time()))
+
+    for mem in memories:
+        if is_dirty_memory(mem):
+            quarantined = dict(mem)
+            quarantined.setdefault("metadata", {})
+            quarantined["metadata"] = {
+                **quarantined["metadata"],
+                "quarantined": True,
+                "quarantine_reason": "dirty_memory",
+                "quarantined_at": now,
+            }
+            moved.append(quarantined)
+        else:
+            kept.append(mem)
+
+    if not moved:
+        return {"moved": 0, "kept": len(kept)}
+
+    existing = load_quarantined_memories()
+    seen_ids = {item.get("id") for item in existing}
+    existing.extend(item for item in moved if item.get("id") not in seen_ids)
+    save_memories(kept)
+    save_quarantined_memories(existing)
+    return {"moved": len(moved), "kept": len(kept)}
+
+
+def _is_high_value_memory(mem: Dict[str, Any]) -> bool:
+    mem_type = mem.get("type", "context")
+    importance = float(mem.get("importance", 0.5) or 0.5)
+    metadata = mem.get("metadata", {}) or {}
+    if mem_type in ("user_preference", "user_info", "project", "goal", "reflection"):
+        return True
+    if importance >= 0.65:
+        return True
+    if metadata.get("source") != "chat":
+        return True
+    return False
+
+
+def _mix_recent_chat_memories(
+    primary_results: List[Dict[str, Any]],
+    all_memories: List[Dict[str, Any]],
+    top_k: int,
+) -> List[Dict[str, Any]]:
+    results: List[Dict[str, Any]] = []
+    seen_ids = set()
+
+    high_value = [item for item in primary_results if _is_high_value_memory(item)]
+    others = [item for item in primary_results if item.get("id") not in {m.get("id") for m in high_value}]
+
+    target_recent_count = min(3, max(1, top_k // 3)) if top_k > 2 else 0
+    recent_chat_candidates = []
+    for mem in sorted(all_memories, key=lambda item: _coerce_timestamp(item.get("created_at", 0)), reverse=True):
+        metadata = mem.get("metadata", {}) or {}
+        if metadata.get("source") != "chat":
+            continue
+        if _is_high_value_memory(mem):
+            continue
+        recent_chat_candidates.append({
+            "id": mem.get("id"),
+            "content": mem.get("content"),
+            "type": mem.get("type", "context"),
+            "importance": mem.get("importance", 0.5),
+            "score": 0.22,
+            "vector_score": 0.0,
+            "created_at": mem.get("created_at"),
+            "metadata": metadata,
+        })
+        if len(recent_chat_candidates) >= target_recent_count:
+            break
+
+    if target_recent_count and recent_chat_candidates:
+        high_value = high_value[: max(0, top_k - len(recent_chat_candidates))]
+
+    for bucket in (high_value, recent_chat_candidates, others):
+        for item in bucket:
+            mem_id = item.get("id")
+            if not mem_id or mem_id in seen_ids:
+                continue
+            seen_ids.add(mem_id)
+            results.append(item)
+            if len(results) >= top_k:
+                return results
+
+    return results[:top_k]
+
+
 async def search_memories(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     if not query:
         return []
 
     paths = _memory_paths()
+    all_memories = load_memories()
     query_embedding = get_embedding(query)
     if not query_embedding:
         return []
@@ -124,7 +254,6 @@ async def search_memories(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
                     v = v / norm
                 search_k = min(top_k * 4, index.ntotal)
                 scores, indices = index.search(v, search_k)
-                all_memories = load_memories()
                 memory_map = {m.get("id"): m for m in all_memories}
 
                 results = []
@@ -151,15 +280,15 @@ async def search_memories(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
                         "score": float(final_score),
                         "vector_score": float(score),
                         "created_at": mem.get("created_at"),
+                        "metadata": mem.get("metadata", {}),
                     })
                 results.sort(key=lambda item: item["score"], reverse=True)
-                return results[:top_k]
+                return _mix_recent_chat_memories(results, all_memories, top_k)
     except Exception as e:
         print(f"[Faiss] 索引搜索失败: {e}")
 
     results = []
-    memories = load_memories()
-    for mem in memories:
+    for mem in all_memories:
         if not mem.get("embedding"):
             continue
         try:
@@ -180,12 +309,13 @@ async def search_memories(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
                 "score": float(final_score),
                 "vector_score": float(vector_score),
                 "created_at": mem.get("created_at"),
+                "metadata": mem.get("metadata", {}),
             })
         except Exception:
             continue
 
     results.sort(key=lambda item: item["score"], reverse=True)
-    return results[:top_k]
+    return _mix_recent_chat_memories(results, all_memories, top_k)
 
 
 async def search_memories_multi_hop(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
@@ -220,6 +350,8 @@ async def add_memory(
     tags: Optional[List[str]] = None,
     auto_detect: bool = True,
     force: bool = False,
+    dedupe: bool = True,
+    metadata: Optional[Dict[str, Any]] = None,
 ):
     if not force and not should_save(content):
         return None
@@ -234,14 +366,17 @@ async def add_memory(
 
     now = str(int(time.time()))
     memories = load_memories()
-    for mem in memories:
-        if mem.get("content", "")[:30] == content[:30]:
-            mem["content"] = content
-            mem["last_hit"] = now
-            mem["hit_count"] = mem.get("hit_count", 0) + 1
-            mem["updated_at"] = now
-            save_memories(memories)
-            return mem
+    if dedupe:
+        for mem in memories:
+            if mem.get("content", "")[:30] == content[:30]:
+                mem["content"] = content
+                mem["last_hit"] = now
+                mem["hit_count"] = mem.get("hit_count", 0) + 1
+                mem["updated_at"] = now
+                if metadata:
+                    mem["metadata"] = {**mem.get("metadata", {}), **metadata}
+                save_memories(memories)
+                return mem
 
     memory = {
         "id": f"mem_{int(time.time() * 1000)}",
@@ -253,6 +388,7 @@ async def add_memory(
         "created_at": now,
         "last_hit": now,
         "hit_count": 0,
+        "metadata": metadata or {},
     }
     memories.append(memory)
     save_memories(memories)

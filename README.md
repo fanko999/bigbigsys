@@ -1,186 +1,158 @@
+# Pig System / 猪猪系统
+
 <p align="center">
-  <img src="./assets/banner.svg" alt="猪猪系统 Banner" width="100%">
+  <img src="./assets/banner.svg" alt="Pig System Banner" width="100%">
 </p>
 
 <p align="center">
   <a href="https://github.com/fanko999/bigbigsys"><img alt="repo" src="https://img.shields.io/badge/repo-bigbigsys-1f7a56?style=for-the-badge"></a>
   <img alt="python" src="https://img.shields.io/badge/Python-3.11-blue?style=for-the-badge">
-  <img alt="fastapi" src="https://img.shields.io/badge/FastAPI-Streaming-0f766e?style=for-the-badge">
+  <img alt="backend" src="https://img.shields.io/badge/FastAPI-Backend-0f766e?style=for-the-badge">
   <img alt="frontend" src="https://img.shields.io/badge/Frontend-Vanilla_Web-bf6f00?style=for-the-badge">
-  <img alt="llm" src="https://img.shields.io/badge/LLM-MiniMax%20%7C%20Ollama-7b3fe4?style=for-the-badge">
+  <img alt="models" src="https://img.shields.io/badge/Models-MiniMax%20%7C%20Ollama-7b3fe4?style=for-the-badge">
 </p>
 
 <p align="center">
-  一个适合长期运行的多角色 AI 聊天系统。
+  A long-memory multi-role AI chat system with real server-side role isolation.
 </p>
 
 <p align="center">
-  多角色隔离、长期记忆、流式输出、可切换模型与向量服务，前后端一体可部署。
+  一套面向长期使用的多角色 AI 聊天系统，强调长期记忆、连续对话、低幻觉和可控数据。
 </p>
 
-## 为什么这套系统值钱
+## 中文简介
 
-它不是单纯的“聊天壳”，而是把以下几件事放到了一起：
+### 这是什么
 
-- 多角色管理
-- 每个角色独立的会话、记忆、成长数据
-- 可切换聊天模型和向量模型
-- 支持 MiniMax、Ollama、本地或远程 API
-- 服务端真正流式输出
-- JSON 文件落地，方便备份、迁移、调试
+猪猪系统不是单纯的聊天壳。
 
-## 核心亮点
+它的核心目标是做一套真正可长期运行的 AI 对话底座：
 
-- 真正的一角色一独立记忆系统，不是前端假分组
-- 记忆、会话、成长、配置全部服务端隔离
-- 支持 MiniMax、Ollama、本地或远程 OpenAI 兼容 API
-- 已支持真正服务端流式输出，不再只是前端假打字机
-- 前端可直接运营角色、编辑 Prompt、导出导入角色与记忆
-- JSON 数据结构清晰，适合迁移、备份、长期维护
-
-## 适合什么场景
-
-- 想做长期陪伴型 AI 角色
-- 想做“一个项目里多个 AI 人设”的系统
-- 想把聊天模型和向量模型拆开部署
-- 想在本地、远程模型机、第三方 API 之间自由切换
-- 想保留可控的数据结构，而不是把状态全部黑盒化
-
-## 界面与体验
-
-- 三栏工作台布局
-- 左右栏可折叠
-- 角色与模型配置同页管理
-- 真流式输出
-- 支持中途停止生成
-- 角色级记忆管理
-
-## 系统预览
-
-当前仓库包含一张 README 封面图，用于表达整体定位和特性：
-
-![Banner](./assets/banner.svg)
-
-## 这套系统的好处
-
-### 1. 一角色一套独立记忆系统
-
-这不是前端假分组，而是服务端真实隔离。
-
-每个角色都有自己独立的：
-
-- 配置
-- 会话
+- 多角色
 - 长期记忆
-- 成长日志
-- 向量索引
+- 连续对话
+- 用户认知
+- 事实判断
+- 低幻觉
+- 可切换聊天模型、视觉模型、向量模型
 
-这意味着你可以同时维护多个不同人格、不同用途的 AI，不会互相串记忆。
+### 这套系统的优势
 
-### 2. 记忆逻辑和聊天逻辑可长期运行
+- 一角色一套独立会话、记忆、成长数据，不是前端假分组
+- 支持 MiniMax、Ollama、本地或远程 OpenAI 兼容 API
+- 支持聊天模型、视觉模型、向量模型分开部署
+- 支持网搜、看图、流式输出、角色导出导入
+- 数据是 JSON 文件，方便备份、迁移、调试和魔改
+- 更适合做长期陪伴型、人格型、私人助理型系统，而不是一次性 demo
 
-系统不是只拼 prompt 就完了，当前消息在进入模型前会经过：
+### 核心能力
 
-1. 读取最近历史对话
-2. 检索相关长期记忆
-3. 可选做一次对话分析
-4. 拼接结构化 system prompt
-5. 再调用主模型生成回复
+- 多角色独立记忆系统
+- 全量聊天入长期记忆
+- 结构化事实层与谨慎信息层
+- 用户表达画像
+- 两步分析再回答
+- 角色 Prompt 管理
+- 服务端角色隔离
+- 向量检索 + Faiss 可选加速
 
-这样做的好处是：
+### 适合谁
 
-- 当前消息优先
-- 历史上下文不容易丢
-- 长期记忆可以持续参与回答
-- 角色人格和系统 prompt 能稳定生效
+- 想做长期陪伴型 AI 的人
+- 想做多角色人格系统的人
+- 想把聊天模型和向量模型拆开的部署者
+- 想保留本地可控数据，而不是全黑盒的人
 
-### 3. 部署简单，数据透明
+## English Overview
 
-数据主要以 JSON 文件存储，目录清晰，方便：
+### What is this
 
-- 本地备份
-- 换机器迁移
-- 做角色导出导入
-- 调试问题时直接看会话和记忆文件
+Pig System is not just a chat UI.
 
-### 4. 模型接入灵活
+It is a long-running AI chat foundation focused on:
 
-你可以自由切换：
+- long-term memory
+- continuous conversations
+- multi-role separation
+- user understanding
+- factual belief handling
+- lower hallucination risk
+- swappable chat, vision, and embedding models
 
-- MiniMax 作为主聊天模型
-- Ollama 作为本地或远程聊天模型
-- 远程 OpenAI 兼容 API
-- 自定义向量模型和向量服务地址
+### Why it matters
 
-### 5. 前端可直接运营角色
+- Real server-side isolation for each role
+- Flexible model routing: MiniMax, Ollama, OpenAI-compatible APIs
+- Separate chat, vision, and embedding backends
+- Exportable, portable, inspectable JSON data
+- Built for long-term personal use, not a throwaway demo
 
-前端支持：
+### Main features
 
-- 创建角色
-- 编辑角色 Prompt
-- 角色导出导入
-- 记忆查看、编辑、删除
-- 切换聊天模型和向量模型
-- 折叠式工作台布局
-- 真流式输出与停止生成
+- role-isolated sessions, memories, and growth data
+- full-chat memory archiving
+- belief and conflict handling
+- user utterance profiling
+- two-step analyze-then-answer flow
+- role prompt editing
+- web search and image understanding
+- optional Faiss acceleration
 
-## 当前架构
+## Architecture
 
 ```text
 frontend/index.html
     ↓
-FastAPI backend/main.py
+backend/main.py
     ↓
-角色隔离上下文 role_context.py
+role_context.py
     ↓
-对话路由 /api/chat /api/chat/stream
+memory_service.py / belief_service.py / utterance_service.py
     ↓
-记忆检索 memory_service.py
-    ↓
-LLM 路由 llm_router.py
-    ├─ MiniMax
-    ├─ Ollama
-    └─ OpenAI 兼容 API
+llm services / minimax / ollama / api-compatible providers
 ```
 
-## 目录结构
+## Project Structure
 
 ```text
 ai-web-chat/
+├─ assets/
 ├─ backend/
 │  ├─ main.py
 │  ├─ config.py
-│  ├─ requirements.txt
 │  ├─ role_context.py
+│  ├─ requirements.txt
 │  └─ services/
 ├─ frontend/
 │  └─ index.html
-├─ data/
-│  ├─ sessions/
-│  ├─ memory/
-│  ├─ growth/
-│  └─ roles/
+├─ data/                  # ignored by git, local runtime data
 ├─ start_backend.bat
 ├─ start_frontend.bat
 └─ README.md
 ```
 
-## 环境要求
-
-### 操作系统
-
-- Windows 优先验证
-- Linux 也可运行，但启动脚本需自行调整
+## Requirements / 环境要求
 
 ### Python
 
-- 推荐 Python 3.11
+- Recommended: `Python 3.11`
+- `Python 3.14` is not recommended for this project yet
 
-不建议优先用 Python 3.14 跑这套依赖，尤其是涉及部分科学计算或向量库时更容易遇到兼容问题。
+### Operating System
 
-### 必备依赖
+- Windows has been tested the most
+- Linux can also run it, but startup scripts may need adjustment
 
-后端基础依赖见 [backend/requirements.txt](/Users/Administrator/Documents/fank/BV/bigbigsys/ai-web-chat/backend/requirements.txt)：
+### Backend dependencies
+
+Install the base dependencies from:
+
+```powershell
+cd backend
+python -m pip install -r requirements.txt
+```
+
+Main packages include:
 
 - `fastapi`
 - `uvicorn`
@@ -190,200 +162,218 @@ ai-web-chat/
 - `requests`
 - `numpy`
 
-### 可选依赖
+### Optional dependency: Faiss
 
-- `faiss-cpu`
-
-说明：
-
-- 没装 `faiss-cpu` 时，系统仍然可以运行
-- 只是向量索引搜索和索引重建会退化或跳过
-- 聊天主链路不会因此直接挂掉
-
-推荐安装方式：
+If you want vector index acceleration:
 
 ```powershell
 python -m pip install faiss-cpu
 ```
 
-## 模型与服务依赖
+If `faiss-cpu` is missing, the system can still run, but vector search/index rebuilding will degrade or be skipped.
 
-你可以按自己的部署方式选择。
+## Model Setup / 模型接入方式
 
-### 方案 A：MiniMax 聊天 + Ollama 向量
+### Option A: MiniMax for chat + Ollama for embeddings
 
-适合你现在这套“主模型走 MiniMax、向量走远程 Ollama”的方式。
+Recommended if you want:
 
-需要：
+- stable main chat model
+- separate embedding service
 
-- 一个可用的 `MiniMax API Key`
-- 一个可访问的 Ollama 向量服务
-- 至少一个 embedding 模型，例如 `bge-large`
+You need:
 
-### 方案 B：全部走 Ollama
+- a valid `MINIMAX_API_KEY`
+- an accessible Ollama embedding host
+- at least one embedding model such as `bge-large`
 
-需要：
+### Option B: Ollama for everything
 
-- 本地或远程 Ollama 服务
-- 一个聊天模型
-- 一个向量模型
+You need:
 
-### 方案 C：OpenAI 兼容 API
+- a local or remote Ollama instance
+- a chat model
+- optionally a vision model
+- an embedding model
 
-需要：
+### Option C: OpenAI-compatible API
 
-- API Base URL
-- API Key
-- 对应模型名
+You need:
 
-## 安装步骤
+- API base URL
+- API key
+- model names
 
-### 1. 克隆或复制项目
+## Installation / 安装步骤
+
+### 1. Clone or copy the project / 克隆或复制项目
 
 ```powershell
 cd C:\your\workspace
+git clone https://github.com/fanko999/bigbigsys.git
+cd bigbigsys\ai-web-chat
 ```
 
-把整个 `ai-web-chat` 项目目录放到目标机器。
+If you do not use `git clone`, copy the `ai-web-chat` directory manually.
 
-### 2. 安装 Python 依赖
+### 2. Install Python dependencies / 安装依赖
 
 ```powershell
 cd backend
 python -m pip install -r requirements.txt
 ```
 
-如果你希望启用 Faiss：
+Optional:
 
 ```powershell
 python -m pip install faiss-cpu
 ```
 
-### 3. 配置环境变量
+### 3. Configure environment variables / 配置环境变量
 
-推荐用环境变量注入密钥，而不是把真实 Key 写进代码。
-
-Windows PowerShell：
+Recommended:
 
 ```powershell
-$env:MINIMAX_API_KEY="你的真实 MiniMax Key"
-$env:MINIMAX_API_HOST="https://api.minimax.chat"
+$env:MINIMAX_API_KEY="your_real_key"
+$env:MINIMAX_API_HOST="https://api.minimaxi.com/v1"
 ```
 
-如果要长期生效，可以写入用户环境变量。
+If you want them to persist, add them to your user environment variables in Windows.
 
-### 4. 检查后端配置
-
-默认配置文件在 [backend/config.py](/Users/Administrator/Documents/fank/BV/bigbigsys/ai-web-chat/backend/config.py)。
-
-你主要需要确认：
-
-- `MODELS["chat"]`
-- `MODELS["vision"]`
-- `MODELS["embedding"]`
-- `OLLAMA_HOSTS`
-- `SERVER["port"]`
-- `FRONTEND["port"]`
-
-### 5. 启动后端
-
-方式一：
+### 4. Start the backend / 启动后端
 
 ```powershell
 cd backend
 python -m uvicorn main:app --host 0.0.0.0 --port 5181
 ```
 
-方式二：
+Or use:
 
-直接运行 [start_backend.bat](/Users/Administrator/Documents/fank/BV/bigbigsys/ai-web-chat/start_backend.bat)。
+```powershell
+..\start_backend.bat
+```
 
-### 6. 启动前端
+### 5. Start the frontend / 启动前端
 
 ```powershell
 cd ..
 python -m http.server 5180
 ```
 
-或者直接运行 [start_frontend.bat](/Users/Administrator/Documents/fank/BV/bigbigsys/ai-web-chat/start_frontend.bat)。
+Or use:
 
-### 7. 打开网页
+```powershell
+start_frontend.bat
+```
 
-- 前端：[http://127.0.0.1:5180](http://127.0.0.1:5180)
-- 后端：[http://127.0.0.1:5181](http://127.0.0.1:5181)
+### 6. Open the app / 打开网页
 
-## 首次使用建议
+- Frontend: `http://127.0.0.1:5180`
+- Backend: `http://127.0.0.1:5181`
 
-首次启动后，建议按这个顺序检查：
+## First Run / 首次使用建议
 
-1. 后端首页能否打开
-2. 前端能否加载角色列表
-3. 角色配置里的聊天模型和向量模型是否正确
-4. MiniMax Key 是否生效
-5. Ollama 地址是否可访问
-6. 先新建一个测试角色再开始正式使用
+Recommended order:
 
-## 角色隔离说明
+1. confirm backend root endpoint works
+2. open the frontend page
+3. check the global model settings
+4. set provider, chat model, vision model, embedding model
+5. verify API key or Ollama addresses
+6. create or edit a role
+7. start a test conversation
 
-### 默认角色
+## Usage / 用法
 
-默认角色 `default` 使用：
+### Global model settings / 全局模型设置
 
-- `data/sessions`
-- `data/memory`
-- `data/growth`
+The right panel controls shared model settings:
 
-### 自定义角色
+- provider
+- chat model
+- vision model
+- embedding model
+- Ollama hosts
+- API base URL
+- API key
+- temperature
+- two-step analysis
 
-每个新角色使用：
+这些模型设置是全局共享的，不再和角色人设混在一起。
 
-- `data/roles/<role_id>/sessions`
-- `data/roles/<role_id>/memory`
-- `data/roles/<role_id>/growth`
-- `data/roles/<role_id>/config.json`
+### Role settings / 角色设置
 
-因此每个角色天然具备独立人格、独立会话、独立记忆，不会与其他角色混用。
+Role editing is separate from model settings.
 
-## 记忆系统说明
+Each role contains:
 
-记忆系统当前保留了原有主逻辑，只做了角色隔离和接口整理。
+- name
+- avatar
+- description
+- prompt
 
-主要流程：
+Each role gets its own server-side data space:
 
-1. 用户消息进入后端
-2. 读取最近历史
-3. 调用 embedding 服务生成向量
-4. 搜索相关记忆
-5. 综合向量分数、重要度、类型权重、时间权重、命中次数排序
-6. 将命中的长期记忆拼入最终 system prompt
+- sessions
+- memory
+- growth
+- config
 
-如果安装了 `faiss-cpu`：
+### Web search / 网搜
 
-- 使用 Faiss 索引加速搜索和重建
+You can trigger web search explicitly from the UI.
 
-如果没有安装：
+The backend can also trigger it when the user clearly asks for recent external information such as:
 
-- 会退回到普通向量比对逻辑
-- 日志里会看到 `No module named 'faiss'`
+- latest news
+- latest reports
+- recent online updates
+- help me search online
 
-## 流式输出说明
+### Vision / 看图
 
-现在系统已经支持真正的服务端流输出：
+Image flow priority:
 
-- 后端接口：`/api/chat/stream`
-- 前端会实时读取 `start / chunk / end / error` 事件
-- 支持中途停止
+1. if the main chat model is multimodal, use it first
+2. otherwise try MiniMax image understanding
+3. otherwise fall back to the configured vision model
 
-这不是前端假装逐字打印，而是服务端真实推流，前端再做平滑渲染。
+## Memory System / 记忆系统说明
 
-## API 简表
+The memory pipeline is designed for long-term use.
 
-### 系统
+Current behavior:
+
+- all chat messages are stored in sessions
+- all chat messages are archived into long-term memory
+- embeddings are generated for long-term memory entries
+- related memories are retrieved for later turns
+- beliefs and user profile layers help the model answer more consistently
+
+Additional cognition layers include:
+
+- belief extraction
+- conflict detection
+- cautious facts vs. trusted facts
+- user utterance type profiling
+
+## Streaming / 流式输出
+
+The project supports real streaming and smoothed rendering.
+
+Current practical behavior:
+
+- MiniMax/API-compatible paths can use real backend streaming
+- Ollama chat can fall back to non-stream backend responses with frontend typewriter rendering for better stability
+
+## API Summary
+
+### System
 
 - `GET /`
 - `GET /api/models`
 
-### 角色
+### Roles
 
 - `GET /api/roles`
 - `POST /api/roles`
@@ -393,76 +383,102 @@ python -m http.server 5180
 - `GET /api/roles/{role_id}/export`
 - `POST /api/roles/import`
 
-### 会话
+### Sessions
 
 - `GET /api/sessions`
 - `POST /api/sessions`
 - `GET /api/sessions/{session_id}`
 - `DELETE /api/sessions/{session_id}`
 
-### 对话
+### Chat
 
 - `POST /api/chat`
 - `POST /api/chat/stream`
 
-### 记忆
+### Memories
 
 - `GET /api/roles/{role_id}/memories`
 - `PUT /api/roles/{role_id}/memories/{memory_id}`
 - `DELETE /api/roles/{role_id}/memories/{memory_id}`
 
-## 发布到 GitHub 前的建议
+### Internal cognition helpers
 
-这一步很重要。
+- beliefs
+- user profile
+- memory search
 
-### 不要提交这些内容
+## Security Notes / 安全提示
 
-- 真实 API Key
-- `data/` 里的真实聊天记录
-- `data/` 里的长期记忆
-- 本地缓存和 `__pycache__`
+Do not commit:
 
-本项目已经加入了 [.gitignore](/Users/Administrator/Documents/fank/BV/bigbigsys/ai-web-chat/.gitignore)，默认会忽略这些内容。
+- real API keys
+- `data/` runtime conversations
+- local vector index data
+- logs and temp files
 
-### 建议提交这些内容
+This repo ignores `data/` by default.
 
-- `backend/`
-- `frontend/`
-- `README.md`
-- 启动脚本
-- 文档说明
+If a real API key was ever exposed before, rotate it immediately.
 
-## 常见问题
+## GitHub Publishing Notes / 发布说明
 
-### 1. 日志出现 `No module named 'faiss'`
+For public publishing:
 
-不是主聊天功能挂了，而是你当前 Python 环境没装 `faiss-cpu`。
+- keep code and docs in git
+- keep local runtime data out of git
+- prefer environment variables for secrets
+- document your model routing clearly
 
-### 2. 页面能打开，但模型不回复
+This repository is meant to be a usable public codebase, while your real private conversations and memories remain local.
 
-优先检查：
+## Troubleshooting / 常见问题
 
-- `MiniMax API Key`
-- `API Base URL`
-- `Ollama` 主机地址
-- 模型名是否存在
-- 远程模型机是否可访问
+### `No module named 'faiss'`
 
-### 3. 换到另一台机器后速度不同
+Install:
 
-通常是下面几项差异造成的：
+```powershell
+python -m pip install faiss-cpu
+```
 
-- 是否安装了 `faiss-cpu`
-- 向量服务是否更快
-- 网络到 MiniMax 是否更稳定
-- 是否是正式模型机在跑 Ollama
+### Chat works but memory retrieval feels weak
 
-## 安全提示
+Check:
 
-如果你准备公开这个项目，请务必先轮换你以前用过的真实 API Key。
+- embedding host
+- embedding model
+- whether embeddings are being generated successfully
+- whether your Ollama or remote embedding service is reachable
 
-即使我已经把仓库里的明文 Key 改成了环境变量读取，旧 Key 只要曾经出现在公开文件或历史记录里，都应该视为已泄露并立即更换。
+### Ollama feels unstable
 
-## 致谢
+Common causes:
 
-这套系统是围绕“猪猪”角色持续迭代出来的一套长期记忆式 AI 聊天服务端 + 前端工程，不是一次性 demo，而是适合持续运行和继续扩展的基础系统。
+- low context length
+- high temperature
+- unstable remote forwarding
+- incomplete payloads in streaming mode
+
+Recommended:
+
+- use a larger context window
+- lower temperature
+- test locally if possible
+
+## Roadmap Direction / 后续方向
+
+This project is best evolved as a general long-memory AI foundation, not a single-purpose vertical app.
+
+That means future improvements should continue focusing on:
+
+- memory quality
+- role stability
+- continuity across long conversations
+- lower hallucination
+- stronger user understanding
+
+## License
+
+No license file is included yet.
+
+If you want this repository to be clearly reusable by others, add a license such as MIT later.
